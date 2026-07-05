@@ -1,0 +1,8 @@
+# Pinned for Intel macOS (x86_64) + Python 3.11.
+# torch dropped x86 macOS wheels after 2.2.x, so we pin the last that ships them.
+# CPU-only; training runs happen on cloud GPU (see PLAN.md Phase 2 T5).
+torch==2.2.2
+torchvision==0.17.2
+numpy==1.26.4
+pyyaml>=6.0
+pytest>=8.0

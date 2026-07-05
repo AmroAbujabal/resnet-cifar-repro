@@ -1,0 +1,21 @@
+# ResNet-56 (n=9, 6n+2=56 layers, ~0.85M params). Paper Table 6 error: 6.97%.
+name: resnet56
+n: 9
+
+optimizer: sgd
+momentum: 0.9
+weight_decay: 1.0e-4
+weight_decay_on_bn: true
+batch_size: 128
+lr: 0.1
+lr_milestones_iters: [32000, 48000]
+lr_gamma: 0.1
+max_iters: 64000
+warmup: false
+
+train_split: 50000
+val_split: 5000
+color_aug: false
+downsample: option_a
+
+seeds: [0, 1, 2]
