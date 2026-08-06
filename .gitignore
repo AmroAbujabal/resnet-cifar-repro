@@ -3,7 +3,7 @@ data/
 checkpoints/
 *.pth
 *.ckpt
-results.csv
+# results.csv is tracked on purpose: it is the reported source of truth.
 
 # python
 .venv/

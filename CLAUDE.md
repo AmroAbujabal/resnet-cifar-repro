@@ -5,16 +5,19 @@ and pre-activation ResNet-56. Full spec + task list in `PLAN.md`.
 
 Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 
-## Status (2026-07-05)
+## Status (2026-08-05)
 
 - **Published, public, MIT.** README + one-click Colab notebook.
-- **15 tests passing on CPU** (T2 metric, T3 model, T4 overfit gate, eval) — built test-first.
+- **24 tests passing on Colab GPU** (438s), including T1 on real CIFAR-10. 15 of those run on CPU
+  locally; the 9 T1 data tests need CIFAR, which this network cannot fetch — see below.
 - **Param counts match Table 6 exactly** (ResNet-20 269,722 … ResNet-110 1,727,962).
-- **T1 (data loader): code-complete + RED-verified, NOT green locally.** The CIFAR mirror is
-  unreachable from this network (Toronto 301→dead `cave` HTTP host; the HTTPS cave endpoint runs
-  ~23 KB/s and never completes — resume corrupts, single-shot times out). This is an environment
-  issue, not a code defect. **T1 verifies on Colab**, where CIFAR downloads in seconds.
-- No training results yet — they land via the Colab run (below), not from this machine.
+- **T1 confirmed green on Colab (2026-08-05).** Locally the CIFAR mirror is unreachable (Toronto
+  301→dead `cave` HTTP host; the HTTPS cave endpoint runs ~23 KB/s and never completes — resume
+  corrupts, single-shot times out). Environment issue, not a code defect, as the Colab run proved.
+- **First results in (1 seed each):** ResNet-20 8.30% (paper 8.75%), ResNet-56 6.91% (paper 6.97%).
+  Both inside ±0.5%, but n=1 — not yet a reproduction claim. Seeds 1–2 pending.
+- `results.csv` is **tracked**, not ignored: it is the reported source of truth, and the Colab run
+  writes it to `MyDrive/resnet-repro/results.csv` so seeds survive a reclaimed session.
 
 ## Environment
 

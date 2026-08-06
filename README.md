@@ -92,12 +92,28 @@ suite and trains ResNet-20/56 — or locally:
 python scripts/train.py --config configs/resnet56.yaml --seed 0 --device cuda
 ```
 
+## Reproduced vs. paper — preliminary (1 seed)
+
+Trained on a Colab T4 with the schedule above, full 50k train split, single-view test evaluation.
+All numbers come from [`results.csv`](results.csv); none are hand-copied.
+
+|     Model | Paper (Table 6) | Reproduced | Δ          | Seeds | Wall clock |
+| --------: | :-------------: | :--------: | :--------- | :---: | ---------: |
+| ResNet-20 |      8.75%      | **8.30%**  | **−0.45%** |   1   |     53 min |
+| ResNet-56 |      6.97%      | **6.91%**  | **−0.06%** |   1   |    129 min |
+
+**These are single-seed runs and are not yet a reproduction claim.** Both land inside the ±0.5%
+target, but with n=1 there is no std to compare against, and CIFAR-10 seed-to-seed spread at this
+scale is a few tenths of a percent — comparable to the gaps above. Seeds 1 and 2 are pending; the
+table gets restated as mean ± std once they land.
+
 ## Status
 
 - ✅ Paper extraction + gap decisions (`PLAN.md`)
-- ✅ Model, metric, training loop, evaluation — built test-first, **15 tests passing** (CPU)
+- ✅ Model, metric, training loop, evaluation — built test-first
 - ✅ Parameter counts verified against Table 6 (above)
-- 🔜 Full training runs on GPU (Colab) — `results.csv` and the reproduced-vs-paper table land here next
+- ✅ **Full suite green on real CIFAR-10: 24 passing** (Colab T4) — including the data-pipeline tests
+- 🔜 Seeds 1–2 for both models → mean ± std, replacing the preliminary table above
 
 ## Extensions (planned)
 
