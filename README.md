@@ -85,8 +85,9 @@ pip install -r requirements.txt
 python -m pytest -q
 ```
 
-**Training (GPU):** open the [Colab notebook](notebooks/reproduce_colab.ipynb) — it runs the full
-suite and trains ResNet-20/56 — or locally:
+**Training (GPU):** open the [Colab notebook](notebooks/reproduce_colab.ipynb) or the
+[Kaggle notebook](notebooks/reproduce_kaggle.ipynb) — each runs the full suite and trains
+ResNet-20/56, skipping any seed already recorded in `results.csv` — or locally:
 
 ```bash
 python scripts/train.py --config configs/resnet56.yaml --seed 0 --device cuda
