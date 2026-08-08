@@ -5,7 +5,7 @@ and pre-activation ResNet-56. Full spec + task list in `PLAN.md`.
 
 Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 
-## Status (2026-08-05)
+## Status (2026-08-08)
 
 - **Published, public, MIT.** README + one-click Colab notebook.
 - **24 tests passing on Colab GPU** (438s), including T1 on real CIFAR-10. 15 of those run on CPU
@@ -14,10 +14,14 @@ Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 - **T1 confirmed green on Colab (2026-08-05).** Locally the CIFAR mirror is unreachable (Toronto
   301→dead `cave` HTTP host; the HTTPS cave endpoint runs ~23 KB/s and never completes — resume
   corrupts, single-shot times out). Environment issue, not a code defect, as the Colab run proved.
-- **First results in (1 seed each):** ResNet-20 8.30% (paper 8.75%), ResNet-56 6.91% (paper 6.97%).
-  Both inside ±0.5%, but n=1 — not yet a reproduction claim. Seeds 1–2 pending.
-- `results.csv` is **tracked**, not ignored: it is the reported source of truth, and the Colab run
-  writes it to `MyDrive/resnet-repro/results.csv` so seeds survive a reclaimed session.
+- **Phase 2 COMPLETE (2026-08-08), 3 seeds each:** ResNet-20 **8.39 ± 0.31%** (paper 8.75%, Δ−0.36)
+  and ResNet-56 **7.45 ± 0.69%** (paper 6.97%, Δ+0.48). Both inside ±0.5% — the DoD is met.
+  ResNet-56 clears it by 0.02% only because seed 2 came in at 8.22%; see the README caveats.
+- `results.csv` is **tracked**, not ignored: it is the reported source of truth. The Colab run
+  writes it to `MyDrive/resnet-repro/results.csv` and the Kaggle run to `/kaggle/working/`, so
+  seeds survive a reclaimed session.
+- **Kaggle is the runner** (`notebooks/reproduce_kaggle.ipynb`, 30 GPU-h/week, Save & Run All is
+  headless). Colab's free GPU quota was exhausted and is not worth fighting.
 
 ## Environment
 
@@ -55,6 +59,6 @@ mean over ≥3 seeds.
 
 ## Next step
 
-Run `notebooks/reproduce_colab.ipynb` on a Colab GPU: it runs `pytest -q` (turns T1 green on real
-data) and trains ResNet-20/56 across seeds → fills `results.csv` and the reproduced-vs-paper table
-in the README. Only after repro is validated: Phase 3 (pre-activation ResNet-56 × CIFAR-10/100).
+Phase 2 is validated, so Phase 3 is unblocked: pre-activation ResNet-56 × {CIFAR-10, CIFAR-100},
+TDD as usual, run via `notebooks/reproduce_kaggle.ipynb`. Budget ~2.1 h/seed for a 56-layer run;
+keep each Kaggle version under the session limit (split models across versions if tight).

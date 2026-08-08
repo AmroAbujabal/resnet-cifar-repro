@@ -93,20 +93,30 @@ ResNet-20/56, skipping any seed already recorded in `results.csv` — or locally
 python scripts/train.py --config configs/resnet56.yaml --seed 0 --device cuda
 ```
 
-## Reproduced vs. paper — preliminary (1 seed)
+## Reproduced vs. paper
 
-Trained on a Colab T4 with the schedule above, full 50k train split, single-view test evaluation.
-All numbers come from [`results.csv`](results.csv); none are hand-copied.
+Trained on T4 GPUs (Colab, then Kaggle) with the schedule above, full 50k train split, single-view
+test evaluation. All numbers come from [`results.csv`](results.csv); none are hand-copied.
 
-|     Model | Paper (Table 6) | Reproduced | Δ          | Seeds | Wall clock |
-| --------: | :-------------: | :--------: | :--------- | :---: | ---------: |
-| ResNet-20 |      8.75%      | **8.30%**  | **−0.45%** |   1   |     53 min |
-| ResNet-56 |      6.97%      | **6.91%**  | **−0.06%** |   1   |    129 min |
+|     Model | Paper (Table 6) |   Reproduced (mean ± std, 3 seeds) | Δ          | Per-seed error      | Wall clock |
+| --------: | :-------------: | ---------------------------------: | :--------- | :------------------ | ---------: |
+| ResNet-20 |      8.75%      | **8.39 ± 0.31%**                   | **−0.36%** | 8.30 / 8.13 / 8.73  |    140 min |
+| ResNet-56 |      6.97%      | **7.45 ± 0.69%**                   | **+0.48%** | 6.91 / 7.21 / 8.22  |    378 min |
 
-**These are single-seed runs and are not yet a reproduction claim.** Both land inside the ±0.5%
-target, but with n=1 there is no std to compare against, and CIFAR-10 seed-to-seed spread at this
-scale is a few tenths of a percent — comparable to the gaps above. Seeds 1 and 2 are pending; the
-table gets restated as mean ± std once they land.
+**Both models reproduce within the ±0.5% target on the mean of 3 seeds** (seeds 0, 1, 2), which is
+this project's definition of done.
+
+Two caveats worth stating plainly:
+
+- **ResNet-56 clears the bar by 0.02%.** Its mean is dragged up by seed 2 at 8.22% — 1.3% worse than
+  seed 0 and well outside the other two. Seeds 0 and 1 (6.91%, 7.21%) straddle the paper's 6.97%
+  closely; on those alone the match would look much tighter. One unlucky trajectory out of three is
+  consistent with the deeper net being harder to optimise, but n=3 cannot separate that from noise.
+- **ResNet-56's std (0.69%) is more than double ResNet-20's (0.31%)**, so its interval genuinely
+  overlaps the paper's number — the point estimate is not the whole story.
+
+More seeds would tighten both intervals; 3 is the minimum this repo committed to, not a claim that
+3 is enough to characterise the tail.
 
 ## Status
 
@@ -114,7 +124,7 @@ table gets restated as mean ± std once they land.
 - ✅ Model, metric, training loop, evaluation — built test-first
 - ✅ Parameter counts verified against Table 6 (above)
 - ✅ **Full suite green on real CIFAR-10: 24 passing** (Colab T4) — including the data-pipeline tests
-- 🔜 Seeds 1–2 for both models → mean ± std, replacing the preliminary table above
+- ✅ **Phase 2 done: ResNet-20 and ResNet-56 reproduced within ±0.5% over 3 seeds** (table above)
 
 ## Extensions (planned)
 
