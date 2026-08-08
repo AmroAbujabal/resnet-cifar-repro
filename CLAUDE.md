@@ -8,8 +8,8 @@ Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 ## Status (2026-08-08)
 
 - **Published, public, MIT.** README + one-click Colab notebook.
-- **24 tests passing on Colab GPU** (438s), including T1 on real CIFAR-10. 15 of those run on CPU
-  locally; the 9 T1 data tests need CIFAR, which this network cannot fetch — see below.
+- **22 tests pass locally on CPU**; the 11 data tests need CIFAR, which this network cannot fetch,
+  so the full suite (33) runs on cloud GPU — see below.
 - **Param counts match Table 6 exactly** (ResNet-20 269,722 … ResNet-110 1,727,962).
 - **T1 confirmed green on Colab (2026-08-05).** Locally the CIFAR mirror is unreachable (Toronto
   301→dead `cave` HTTP host; the HTTPS cave endpoint runs ~23 KB/s and never completes — resume
@@ -19,7 +19,10 @@ Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
   ResNet-56 clears it by 0.02% only because seed 2 came in at 8.22%; see the README caveats.
 - `results.csv` is **tracked**, not ignored: it is the reported source of truth. The Colab run
   writes it to `MyDrive/resnet-repro/results.csv` and the Kaggle run to `/kaggle/working/`, so
-  seeds survive a reclaimed session.
+  seeds survive a reclaimed session. It gained a `train_error_pct` column for Phase 3 (PLAN.md
+  wants train error per cell); the six Phase 2 rows are **empty** there, not zero — those runs
+  never measured it. `train.py` asserts the on-disk header matches the row it is about to append,
+  because `DictWriter` would otherwise silently misalign every value against an older schema.
 - **Kaggle is the runner** (`notebooks/reproduce_kaggle.ipynb`, 30 GPU-h/week, Save & Run All is
   headless). Colab's free GPU quota was exhausted and is not worth fighting.
 
@@ -46,8 +49,8 @@ Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 
 ## Running tests
 
-- **Locally (no dataset needed):** the model/metric/train/eval suites —
-  `.venv/bin/python -m pytest tests/test_metric.py tests/test_model.py tests/test_train.py tests/test_eval.py -q`
+- **Locally (no dataset needed):** the model/config/metric/train/eval suites —
+  `.venv/bin/python -m pytest tests/ --ignore=tests/test_data.py -q`
 - **Full suite incl. T1 data tests:** run on Colab (or after placing a valid
   `data/cifar-10-python.tar.gz`, md5 `c58f30108f718f92721af3b95e74349a`) — `python -m pytest -q`.
   Do NOT run the full suite locally against the live mirror; the T1 download hangs.
@@ -57,8 +60,26 @@ Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 ResNet-20 and ResNet-56 within **±0.5% absolute** of paper error (≤9.25%, ≤7.47%),
 mean over ≥3 seeds.
 
+## Phase 3 (code landed, runs pending)
+
+The 2×2 is {original, pre-act} ResNet-56 × {CIFAR-10, CIFAR-100}. `resnet56` × CIFAR-10 is
+already done, so three configs remain: `preact56`, `resnet56_c100`, `preact56_c100`. Everything
+except `name` / `dataset` / `num_classes` / `preact` is copied from `resnet56.yaml` and held fixed.
+
+- Pre-act = `resnet(n, preact=True)` (He 2016 Fig 4e, full pre-activation, clean identity).
+  **Param count is exactly identical to the original** — the head BN(64) costs +96, and the two
+  dimension-changing blocks give back −96 by normalizing `in_c` instead of `out_c`.
+  Dimension-changing blocks follow the reference's `both_preact`: the shared BN-ReLU is applied
+  **before** the branch split, so the Option-A shortcut subsamples the pre-activated signal, not
+  the raw signed input. A test pins this — it is easy to get wrong and invisible in the loss curve.
+- CIFAR-100 reuses the whole pipeline via `dataset="cifar100"`; the per-pixel mean is recomputed
+  from its own train split (a test asserts it differs from CIFAR-10's).
+- Config `name` is the `model` column in `results.csv` and the key the notebooks skip on, so the
+  four cells never collide. `tests/test_configs.py` builds every config before it costs GPU time.
+
 ## Next step
 
-Phase 2 is validated, so Phase 3 is unblocked: pre-activation ResNet-56 × {CIFAR-10, CIFAR-100},
-TDD as usual, run via `notebooks/reproduce_kaggle.ipynb`. Budget ~2.1 h/seed for a 56-layer run;
-keep each Kaggle version under the session limit (split models across versions if tight).
+Run the three remaining configs, **one per Kaggle saved version** (~6.3 h each: 3 seeds ×
+~2.1 h). Set `PHASE3` in the Phase 3 cell of `notebooks/reproduce_kaggle.ipynb`, Save & Run All,
+then pull the output, commit `results.csv`, push, and repeat. A run killed at the session limit
+discards `/kaggle/working` entirely — never put two configs in one version.

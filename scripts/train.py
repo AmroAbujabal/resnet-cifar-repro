@@ -55,8 +55,11 @@ def main():
     loaders = get_loaders(
         args.data_root, batch_size=cfg["batch_size"], val_size=cfg["val_split"],
         seed=args.seed, full_train=(cfg["train_split"] == 50000), num_workers=2,
+        dataset=cfg.get("dataset", "cifar10"),
     )
-    model = resnet(cfg["n"], num_classes=cfg.get("num_classes", 10)).to(device)
+    model = resnet(
+        cfg["n"], num_classes=cfg.get("num_classes", 10), preact=cfg.get("preact", False)
+    ).to(device)
     opt = torch.optim.SGD(
         model.parameters(), lr=cfg["lr"], momentum=cfg["momentum"],
         weight_decay=cfg["weight_decay"],
@@ -96,17 +99,26 @@ def main():
             break
 
     test_err = evaluate(model, loaders["test"], device)
+    train_err = evaluate(model, loaders["train_eval"], device)  # un-augmented view
     wall = time.time() - start
-    print(f"DONE {cfg['name']} seed {args.seed}: test error {test_err:.2f}% in {wall/60:.1f} min")
+    print(f"DONE {cfg['name']} seed {args.seed}: test error {test_err:.2f}%, "
+          f"train error {train_err:.2f}% in {wall/60:.1f} min")
 
     row = {
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "model": cfg["name"], "n": cfg["n"], "seed": args.seed,
         "iters": max_iters, "test_error_pct": round(test_err, 2),
+        "train_error_pct": round(train_err, 2),
         "final_train_loss": round(loss, 4), "wall_min": round(wall / 60, 1),
         "device": str(device),
     }
     write_header = not os.path.exists(args.results)
+    if not write_header:
+        # DictWriter writes in row order regardless of what is on disk, so a results.csv
+        # from an older schema would silently misalign every value in every appended row.
+        with open(args.results, newline="") as f:
+            header = next(csv.reader(f), None)
+        assert header == list(row), f"{args.results} header {header} != {list(row)}"
     with open(args.results, "a", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(row))
         if write_header:

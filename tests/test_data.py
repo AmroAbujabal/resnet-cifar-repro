@@ -70,6 +70,28 @@ def test_per_pixel_mean_centers_training_data():
     assert centered < 1e-5
 
 
+def test_train_eval_is_the_same_images_without_augmentation():
+    # train error is reported on this view, so it must be the training images through
+    # the eval transform -- same indices as train, deterministic on re-read.
+    ds = get_datasets(root=ROOT, val_size=5000, seed=0)
+    assert list(ds["train_eval"].indices) == list(ds["train"].indices)
+    assert torch.equal(ds["train_eval"][0][0], ds["train_eval"][0][0])
+
+
+def test_cifar100_has_same_shape_splits_and_100_classes():
+    # Phase 3 cell B: same 32x32x3 / 50k-10k pipeline, only the label space changes.
+    ds = get_datasets(root=ROOT, val_size=5000, seed=0, dataset="cifar100")
+    assert (len(ds["train"]), len(ds["val"]), len(ds["test"])) == (45000, 5000, 10000)
+    assert max(ds["test"].targets) == 99
+    assert ds["test"][0][0].shape == (3, 32, 32)
+
+
+def test_cifar100_mean_is_recomputed_not_reused_from_cifar10():
+    m10 = compute_per_pixel_mean(root=ROOT, val_size=5000, seed=0)
+    m100 = compute_per_pixel_mean(root=ROOT, val_size=5000, seed=0, dataset="cifar100")
+    assert not torch.allclose(m10, m100)
+
+
 def test_mean_uses_train_only_not_val():
     # mean over the 45k train split must differ from mean over the full 50k
     # (guards against val/test leakage into the statistic)
