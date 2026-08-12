@@ -118,19 +118,34 @@ Two caveats worth stating plainly:
 More seeds would tighten both intervals; 3 is the minimum this repo committed to, not a claim that
 3 is enough to characterise the tail.
 
+## Extension: pre-activation vs. original (in progress)
+
+A controlled 2×2 — **{original, pre-activation} ResNet-56** × **{CIFAR-10, CIFAR-100}** — with seeds,
+schedule, augmentation and **parameter budget** held fixed (the pre-activation variant has _exactly_
+the same 853,018 parameters, not approximately). Two of the four cells have run:
+
+|      Model | Dataset  | Test error (mean ± std, 3 seeds) | Per-seed error     |
+| ---------: | :------- | -------------------------------: | :----------------- |
+| ResNet-56  | CIFAR-10 |                   7.45 ± 0.69%   | 6.91 / 7.21 / 8.22 |
+| pre-act 56 | CIFAR-10 |               **7.22 ± 0.29%**   | 7.08 / 7.03 / 7.55 |
+
+Pre-activation is **0.23% better on the mean — smaller than either std, so this is within noise**, not
+a demonstrated improvement. What is more suggestive is the spread: the original's seed 2 blew out to
+8.22%, while the pre-activation runs stayed inside a 0.5% band. He et al. (2016) attribute exactly
+that to the clean identity path easing optimisation, but n=3 at one depth cannot establish it. At
+depth 56 the paper itself reports the two orderings as near-identical; the gap it documents opens at
+110+ layers.
+
+CIFAR-100 (both orderings) is still to run.
+
 ## Status
 
 - ✅ Paper extraction + gap decisions (`PLAN.md`)
 - ✅ Model, metric, training loop, evaluation — built test-first
 - ✅ Parameter counts verified against Table 6 (above)
-- ✅ **Full suite green on real CIFAR-10: 24 passing** (Colab T4) — including the data-pipeline tests
+- ✅ **Full suite green on real CIFAR-10 + CIFAR-100: 36 passing** (Kaggle T4) — including the data-pipeline tests
 - ✅ **Phase 2 done: ResNet-20 and ResNet-56 reproduced within ±0.5% over 3 seeds** (table above)
-
-## Extensions (planned)
-
-A controlled 2×2 study, holding seeds / schedule / budget fixed:
-**{original, pre-activation ResNet-56}** × **{CIFAR-10, CIFAR-100}** — isolating the effect of the
-[pre-activation ordering](https://arxiv.org/abs/1603.05027) (He et al., 2016) and of class count.
+- 🔄 **Phase 3 (2×2 extension): 2 of 4 cells run** — CIFAR-10 done for both orderings, CIFAR-100 pending
 
 ## References
 
