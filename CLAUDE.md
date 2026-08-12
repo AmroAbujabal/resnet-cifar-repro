@@ -77,9 +77,26 @@ except `name` / `dataset` / `num_classes` / `preact` is copied from `resnet56.ya
 - Config `name` is the `model` column in `results.csv` and the key the notebooks skip on, so the
   four cells never collide. `tests/test_configs.py` builds every config before it costs GPU time.
 
+## Phase 3 progress
+
+- ✅ `resnet56` × CIFAR-10 — **7.45 ± 0.69%** (Phase 2).
+- ✅ `preact56` × CIFAR-10 — **7.22 ± 0.29%** (Kaggle version 2, 2026-08-11, commit `1ec7995`).
+  0.23% better than the original, which is **smaller than either std → within noise**, not a win.
+- 🔄 `resnet56_c100` — running as version 3 (launched 2026-08-11 ~22:47 local, ETA ~06:00 Aug 12).
+- ⬜ `preact56_c100` — last one owed.
+
+CIFAR-100 has **no paper baseline** here (He 2015 Table 6 is CIFAR-10 only), so those two cells are
+an internal pre-act-vs-original comparison at fixed budget, not a reproduction claim.
+
 ## Next step
 
-Run the three remaining configs, **one per Kaggle saved version** (~6.3 h each: 3 seeds ×
-~2.1 h). Set `PHASE3` in the Phase 3 cell of `notebooks/reproduce_kaggle.ipynb`, Save & Run All,
-then pull the output, commit `results.csv`, push, and repeat. A run killed at the session limit
-discards `/kaggle/working` entirely — never put two configs in one version.
+Run the remaining configs **one per Kaggle saved version** (~7.2 h each: ~1.1 h of pytest and CIFAR
+downloads, then 3 seeds × ~2.0 h). Set `PHASE3` in the Phase 3 cell of
+`notebooks/reproduce_kaggle.ipynb`, then `cd notebooks && ../.venv/bin/kaggle kernels push -p .`
+(this **launches immediately — there is no dry-run**). Pull the output with `kernels output`, commit
+`results.csv`, push, repeat. Two rules that cost real GPU hours when broken:
+
+- **Push `results.csv` to GitHub _before_ launching the next run** — the notebook seeds its results
+  file from the cloned repo, so an unpushed row is a row the next run neither skips nor carries.
+- **Never put two configs in one version** — a run killed at the session limit discards
+  `/kaggle/working` entirely.
