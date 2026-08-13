@@ -98,10 +98,10 @@ python scripts/train.py --config configs/resnet56.yaml --seed 0 --device cuda
 Trained on T4 GPUs (Colab, then Kaggle) with the schedule above, full 50k train split, single-view
 test evaluation. All numbers come from [`results.csv`](results.csv); none are hand-copied.
 
-|     Model | Paper (Table 6) |   Reproduced (mean ± std, 3 seeds) | Δ          | Per-seed error      | Wall clock |
-| --------: | :-------------: | ---------------------------------: | :--------- | :------------------ | ---------: |
-| ResNet-20 |      8.75%      | **8.39 ± 0.31%**                   | **−0.36%** | 8.30 / 8.13 / 8.73  |    140 min |
-| ResNet-56 |      6.97%      | **7.45 ± 0.69%**                   | **+0.48%** | 6.91 / 7.21 / 8.22  |    378 min |
+|     Model | Paper (Table 6) | Reproduced (mean ± std, 3 seeds) | Δ          | Per-seed error     | Wall clock |
+| --------: | :-------------: | -------------------------------: | :--------- | :----------------- | ---------: |
+| ResNet-20 |      8.75%      |                 **8.39 ± 0.31%** | **−0.36%** | 8.30 / 8.13 / 8.73 |    140 min |
+| ResNet-56 |      6.97%      |                 **7.45 ± 0.69%** | **+0.48%** | 6.91 / 7.21 / 8.22 |    378 min |
 
 **Both models reproduce within the ±0.5% target on the mean of 3 seeds** (seeds 0, 1, 2), which is
 this project's definition of done.
@@ -118,32 +118,50 @@ Two caveats worth stating plainly:
 More seeds would tighten both intervals; 3 is the minimum this repo committed to, not a claim that
 3 is enough to characterise the tail.
 
-## Extension: pre-activation vs. original (in progress)
+## Extension: pre-activation vs. original — no detectable difference at depth 56
 
 A controlled 2×2 — **{original, pre-activation} ResNet-56** × **{CIFAR-10, CIFAR-100}** — with seeds,
 schedule, augmentation and **parameter budget** held fixed (the pre-activation variant has _exactly_
-the same 853,018 parameters, not approximately). Three of the four cells have run:
+the same 853,018 parameters, not approximately). All four cells are complete, 12 runs total:
 
-|      Model | Dataset   | Test error (mean ± std, 3 seeds) | Per-seed error        |
-| ---------: | :-------- | -------------------------------: | :-------------------- |
-| ResNet-56  | CIFAR-10  |                   7.45 ± 0.69%   | 6.91 / 7.21 / 8.22    |
-| pre-act 56 | CIFAR-10  |               **7.22 ± 0.29%**   | 7.08 / 7.03 / 7.55    |
-| ResNet-56  | CIFAR-100 |                  29.75 ± 0.42%   | 29.33 / 30.16 / 29.77 |
-| pre-act 56 | CIFAR-100 |                        _pending_ | —                     |
+|      Model | Dataset   | Test error (mean ± std, 3 seeds) | Per-seed error        | Train error |
+| ---------: | :-------- | -------------------------------: | :-------------------- | ----------: |
+|  ResNet-56 | CIFAR-10  |                     7.45 ± 0.69% | 6.91 / 7.21 / 8.22    |           — |
+| pre-act 56 | CIFAR-10  |                     7.22 ± 0.29% | 7.08 / 7.03 / 7.55    |  0.02–0.03% |
+|  ResNet-56 | CIFAR-100 |                    29.75 ± 0.42% | 29.33 / 30.16 / 29.77 |  0.51–0.64% |
+| pre-act 56 | CIFAR-100 |                    29.97 ± 0.37% | 29.96 / 30.35 / 29.61 |  0.48–0.49% |
 
-Pre-activation is **0.23% better on the mean — smaller than either std, so this is within noise**, not
-a demonstrated improvement. What is more suggestive is the spread: the original's seed 2 blew out to
-8.22%, while the pre-activation runs stayed inside a 0.5% band. He et al. (2016) attribute exactly
-that to the clean identity path easing optimisation, but n=3 at one depth cannot establish it. At
-depth 56 the paper itself reports the two orderings as near-identical; the gap it documents opens at
-110+ layers.
+**Finding: at depth 56, pre-activation does not measurably beat the original.** This is a null
+result reported as a finding, not a shortfall.
 
-**CIFAR-100 has no paper baseline** — He et al. (2015) Table 6 is CIFAR-10 only, so the CIFAR-100 row
-is not a reproduction claim. It is the same network and schedule pointed at a 100-way problem, and it
-exists to give the pre-activation comparison a second dataset at fixed budget. The original ResNet-56
-lands at **29.75 ± 0.42%** there, with train error near zero (0.5–0.6%) — the model fully fits 50k
-images across 100 classes and the remaining error is generalisation, not underfitting. The
-pre-activation cell is still to run.
+| Dataset   | Δ (pre-act − original) | Combined std | Verdict      |
+| :-------- | ---------------------: | -----------: | :----------- |
+| CIFAR-10  |                 −0.23% |        0.74% | within noise |
+| CIFAR-100 |                 +0.22% |        0.56% | within noise |
+
+The two deltas are each roughly **one third of the combined std, and they point in opposite
+directions** — pre-activation looks slightly better on CIFAR-10 and slightly worse on CIFAR-100.
+That sign flip is the clearest statement the experiment can make: had there been a real effect of
+this size, it would not reverse across datasets. Nothing here separates the two blocks at this depth.
+
+This agrees with He et al. (2016), which is the point of running it. Their own CIFAR-10 comparison at
+depth 110 is near-identical between the two blocks; the advantage they document opens up at 1001
+layers, where the identity path's effect on optimisation stops being marginal. Depth 56 is well below
+that regime, so a null is the expected outcome — the experiment confirms the boundary of the claim
+rather than the claim itself.
+
+One observation kept deliberately as an observation: **spread, not mean, is where the two differ**.
+The original's CIFAR-10 seed 2 blew out to 8.22% while the three pre-activation runs stayed inside a
+0.5% band, and pre-activation has the smaller std on both datasets (0.29 vs 0.69, 0.37 vs 0.42). That
+is the direction the easier-optimisation story predicts, but comparing stds at n=3 is weak evidence
+and no more seeds were run to chase it — adding seeds only to push a Δ past a threshold would be
+fitting the experiment to a desired answer.
+
+**CIFAR-100 has no paper baseline** — He et al. (2015) Table 6 is CIFAR-10 only, so neither CIFAR-100
+row is a reproduction claim. Those cells exist to give the pre-activation comparison a second dataset
+at fixed budget. On both, train error sits near zero (~0.5%) while test error is ~30%: the networks
+fully fit 50k images across 100 classes, so what remains is generalisation gap, not underfitting —
+and both blocks reach that same fully-fit state, which is consistent with the null.
 
 ## Status
 
@@ -152,8 +170,8 @@ pre-activation cell is still to run.
 - ✅ Parameter counts verified against Table 6 (above)
 - ✅ **Full suite green on real CIFAR-10 + CIFAR-100: 36 passing** (Kaggle T4) — including the data-pipeline tests
 - ✅ **Phase 2 done: ResNet-20 and ResNet-56 reproduced within ±0.5% over 3 seeds** (table above)
-- 🔄 **Phase 3 (2×2 extension): 3 of 4 cells run** — both CIFAR-10 cells + original ResNet-56 on
-  CIFAR-100; pre-act ResNet-56 on CIFAR-100 is the last one
+- ✅ **Phase 3 done: 2×2 extension complete, 12 runs** — pre-activation shows **no detectable
+  difference at depth 56** on either dataset (table above)
 
 ## References
 

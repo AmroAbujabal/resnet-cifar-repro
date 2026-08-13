@@ -84,25 +84,24 @@ except `name` / `dataset` / `num_classes` / `preact` is copied from `resnet56.ya
   0.23% better than the original, which is **smaller than either std → within noise**, not a win.
 - ✅ `resnet56_c100` — **29.75 ± 0.42%** (29.33 / 30.16 / 29.77; Kaggle version 3, 2026-08-12,
   commit `f60ac13`). Train error 0.5–0.6%, so the net fully fits 50k images over 100 classes.
-- 🔄 `preact56_c100` — running as version 4 (launched 2026-08-12 ~19:50 local, ETA ~03:00 Aug 13).
+- ✅ `preact56_c100` — **29.97 ± 0.37%** (29.96 / 30.35 / 29.61; Kaggle version 4, 2026-08-13).
 
 CIFAR-100 has **no paper baseline** here (He 2015 Table 6 is CIFAR-10 only), so those two cells are
 an internal pre-act-vs-original comparison at fixed budget, not a reproduction claim.
 
-**Write-up framing (decided 2026-08-12): the 2×2 reports "no detectable difference at depth 56"** —
-a null result stated as a finding. Do not add seeds to chase significance; report every Δ against
-the combined std and label it within noise. If a cell comes back with a Δ *larger* than the combined
-std, that is new information — report it, don't force the null.
+**PHASE 3 COMPLETE (2026-08-13). The finding is a null: no detectable difference at depth 56.**
+Δ = −0.23% on CIFAR-10 (combined std 0.74) and **+0.22% on CIFAR-100** (combined std 0.56) — each
+~⅓ of the combined std, and **opposite in sign**, which is the strongest form the null can take.
+Matches He 2016, whose gap opens at 1001 layers, not 56. Pre-act has the smaller std on both
+datasets; that stays an observation at n=3, not a claim. No extra seeds — chasing significance would
+be fitting the experiment to a desired answer.
 
-## Next step
+## Kaggle rules (cost real GPU hours when broken)
 
-Run the remaining configs **one per Kaggle saved version** (~7.2 h each: ~1.1 h of pytest and CIFAR
-downloads, then 3 seeds × ~2.0 h). Set `PHASE3` in the Phase 3 cell of
-`notebooks/reproduce_kaggle.ipynb`, then `cd notebooks && ../.venv/bin/kaggle kernels push -p .`
-(this **launches immediately — there is no dry-run**). Pull the output with `kernels output`, commit
-`results.csv`, push, repeat. Two rules that cost real GPU hours when broken:
+All four Phase 3 cells are done, so no runs are planned. If one happens anyway:
 
-- **Push `results.csv` to GitHub _before_ launching the next run** — the notebook seeds its results
+- **Push `results.csv` to GitHub _before_ launching the run** — the notebook seeds its results
   file from the cloned repo, so an unpushed row is a row the next run neither skips nor carries.
 - **Never put two configs in one version** — a run killed at the session limit discards
   `/kaggle/working` entirely.
+- `kernels push` **launches immediately — there is no dry-run.**
