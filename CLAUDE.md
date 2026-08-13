@@ -82,8 +82,9 @@ except `name` / `dataset` / `num_classes` / `preact` is copied from `resnet56.ya
 - ✅ `resnet56` × CIFAR-10 — **7.45 ± 0.69%** (Phase 2).
 - ✅ `preact56` × CIFAR-10 — **7.22 ± 0.29%** (Kaggle version 2, 2026-08-11, commit `1ec7995`).
   0.23% better than the original, which is **smaller than either std → within noise**, not a win.
-- 🔄 `resnet56_c100` — running as version 3 (launched 2026-08-11 ~22:47 local, ETA ~06:00 Aug 12).
-- ⬜ `preact56_c100` — last one owed.
+- ✅ `resnet56_c100` — **29.75 ± 0.42%** (29.33 / 30.16 / 29.77; Kaggle version 3, 2026-08-12,
+  commit `f60ac13`). Train error 0.5–0.6%, so the net fully fits 50k images over 100 classes.
+- 🔄 `preact56_c100` — running as version 4 (launched 2026-08-12 ~19:50 local, ETA ~03:00 Aug 13).
 
 CIFAR-100 has **no paper baseline** here (He 2015 Table 6 is CIFAR-10 only), so those two cells are
 an internal pre-act-vs-original comparison at fixed budget, not a reproduction claim.
