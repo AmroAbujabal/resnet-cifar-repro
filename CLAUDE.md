@@ -89,6 +89,11 @@ except `name` / `dataset` / `num_classes` / `preact` is copied from `resnet56.ya
 CIFAR-100 has **no paper baseline** here (He 2015 Table 6 is CIFAR-10 only), so those two cells are
 an internal pre-act-vs-original comparison at fixed budget, not a reproduction claim.
 
+**Write-up framing (decided 2026-08-12): the 2×2 reports "no detectable difference at depth 56"** —
+a null result stated as a finding. Do not add seeds to chase significance; report every Δ against
+the combined std and label it within noise. If a cell comes back with a Δ *larger* than the combined
+std, that is new information — report it, don't force the null.
+
 ## Next step
 
 Run the remaining configs **one per Kaggle saved version** (~7.2 h each: ~1.1 h of pytest and CIFAR
