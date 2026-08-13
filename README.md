@@ -5,8 +5,8 @@ Recognition](https://arxiv.org/abs/1512.03385)** (He, Zhang, Ren & Sun, 2015) �
 paper alone, under test-driven development, then extended into a controlled study of residual
 learning across depth, architecture, and dataset.
 
-**📄 Read the write-up: [resnet-cifar-repro.vercel.app](https://resnet-cifar-repro.vercel.app)** — the
-full results as a paper, with figures rendered from `results.csv`. Source in [`site/`](site/).
+**📄 Read the write-up: [resnet.amrabujabal.com](https://resnet.amrabujabal.com)** — the full
+results as a paper, with figures rendered from `results.csv`. Source in [`site/`](site/).
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AmroAbujabal/resnet-cifar-repro/blob/main/notebooks/reproduce_colab.ipynb)
 
