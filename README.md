@@ -122,12 +122,14 @@ More seeds would tighten both intervals; 3 is the minimum this repo committed to
 
 A controlled 2×2 — **{original, pre-activation} ResNet-56** × **{CIFAR-10, CIFAR-100}** — with seeds,
 schedule, augmentation and **parameter budget** held fixed (the pre-activation variant has _exactly_
-the same 853,018 parameters, not approximately). Two of the four cells have run:
+the same 853,018 parameters, not approximately). Three of the four cells have run:
 
-|      Model | Dataset  | Test error (mean ± std, 3 seeds) | Per-seed error     |
-| ---------: | :------- | -------------------------------: | :----------------- |
-| ResNet-56  | CIFAR-10 |                   7.45 ± 0.69%   | 6.91 / 7.21 / 8.22 |
-| pre-act 56 | CIFAR-10 |               **7.22 ± 0.29%**   | 7.08 / 7.03 / 7.55 |
+|      Model | Dataset   | Test error (mean ± std, 3 seeds) | Per-seed error        |
+| ---------: | :-------- | -------------------------------: | :-------------------- |
+| ResNet-56  | CIFAR-10  |                   7.45 ± 0.69%   | 6.91 / 7.21 / 8.22    |
+| pre-act 56 | CIFAR-10  |               **7.22 ± 0.29%**   | 7.08 / 7.03 / 7.55    |
+| ResNet-56  | CIFAR-100 |                  29.75 ± 0.42%   | 29.33 / 30.16 / 29.77 |
+| pre-act 56 | CIFAR-100 |                        _pending_ | —                     |
 
 Pre-activation is **0.23% better on the mean — smaller than either std, so this is within noise**, not
 a demonstrated improvement. What is more suggestive is the spread: the original's seed 2 blew out to
@@ -136,7 +138,12 @@ that to the clean identity path easing optimisation, but n=3 at one depth cannot
 depth 56 the paper itself reports the two orderings as near-identical; the gap it documents opens at
 110+ layers.
 
-CIFAR-100 (both orderings) is still to run.
+**CIFAR-100 has no paper baseline** — He et al. (2015) Table 6 is CIFAR-10 only, so the CIFAR-100 row
+is not a reproduction claim. It is the same network and schedule pointed at a 100-way problem, and it
+exists to give the pre-activation comparison a second dataset at fixed budget. The original ResNet-56
+lands at **29.75 ± 0.42%** there, with train error near zero (0.5–0.6%) — the model fully fits 50k
+images across 100 classes and the remaining error is generalisation, not underfitting. The
+pre-activation cell is still to run.
 
 ## Status
 
@@ -145,7 +152,8 @@ CIFAR-100 (both orderings) is still to run.
 - ✅ Parameter counts verified against Table 6 (above)
 - ✅ **Full suite green on real CIFAR-10 + CIFAR-100: 36 passing** (Kaggle T4) — including the data-pipeline tests
 - ✅ **Phase 2 done: ResNet-20 and ResNet-56 reproduced within ±0.5% over 3 seeds** (table above)
-- 🔄 **Phase 3 (2×2 extension): 2 of 4 cells run** — CIFAR-10 done for both orderings, CIFAR-100 pending
+- 🔄 **Phase 3 (2×2 extension): 3 of 4 cells run** — both CIFAR-10 cells + original ResNet-56 on
+  CIFAR-100; pre-act ResNet-56 on CIFAR-100 is the last one
 
 ## References
 
