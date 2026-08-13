@@ -1,0 +1,1650 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      Reproducing ResNet on CIFAR-10, and a null result for pre-activation at
+      depth 56
+    </title>
+    <meta
+      name="description"
+      content="A from-scratch reproduction of He et al.'s CIFAR-10 ResNet results, and a controlled 2x2 finding no measurable benefit from pre-activation at depth 56."
+    />
+    <meta name="author" content="Amro Abujabal" />
+    <meta property="og:type" content="article" />
+    <meta
+      property="og:title"
+      content="Reproducing ResNet on CIFAR-10, and a null result for pre-activation at depth 56"
+    />
+    <meta
+      property="og:description"
+      content="ResNet-20 and ResNet-56 reproduced within a pre-registered 0.5% tolerance. A controlled 2x2 finds no measurable difference between the original and pre-activation blocks at depth 56."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23fff'/%3E%3Cpath d='M6 22h20M6 16h12M6 10h16' stroke='%231F5C9E' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <style>
+      /* ------------------------------------------------------------------
+     A deliberately single-theme page. This emulates a printed journal
+     article, where the paper is white, so there is no dark variant:
+     every colour is painted explicitly so the page holds its own ground
+     regardless of the viewer's system setting.
+     ------------------------------------------------------------------ */
+      :root {
+        --paper: #ffffff;
+        --surface: #ffffff; /* marker rings read against the paper */
+        --ink: #101418;
+        --ink-2: #333b45;
+        --muted: #6a727d;
+        --rule: #b9c0c8; /* the heavy booktabs rules */
+        --rule-soft: #dfe3e8; /* hairlines inside tables and figures */
+        --tint: #f5f7f9;
+        --accent: #1f5c9e;
+        --sa: #1f5c9e; /* original block. Validated on a light ground. */
+        --sb: #c1670a; /* pre-activation block */
+        --band: rgba(31, 92, 158, 0.08);
+        --serif:
+          "Iowan Old Style", "Charter", "Palatino Linotype", Palatino,
+          "Book Antiqua", Georgia, "Times New Roman", serif;
+        --mono:
+          ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 17px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        font-kerning: normal;
+        font-variant-ligatures: common-ligatures;
+      }
+
+      .sheet {
+        max-width: 43rem;
+        margin: 0 auto;
+        padding: 2.25rem 1.5rem 5rem;
+      }
+
+      /* ---- running head ------------------------------------------------ */
+      .runhead {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1rem;
+        font-size: 0.72rem;
+        /* No small-caps here: this serif renders small-cap figures, which
+           turns the 0 of "CIFAR-10" into something that reads as a letter o.
+           Letter-spaced roman gives the running-head feel without that. */
+        letter-spacing: 0.07em;
+        color: var(--muted);
+        padding-bottom: 0.5rem;
+        border-bottom: 0.5px solid var(--rule-soft);
+        margin-bottom: 2.75rem;
+      }
+      .runhead span:last-child {
+        white-space: nowrap;
+      }
+
+      /* ---- title block ------------------------------------------------- */
+      .masthead {
+        margin-bottom: 2.5rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: clamp(1.5rem, 3.4vw, 1.95rem);
+        line-height: 1.24;
+        font-weight: 600;
+        letter-spacing: -0.005em;
+        margin: 0 auto 1rem;
+        max-width: 32rem;
+        text-wrap: balance;
+      }
+      .byline {
+        font-size: 1.02rem;
+        margin: 0 0 0.3rem;
+      }
+      .affil {
+        font-size: 0.83rem;
+        color: var(--muted);
+        margin: 0;
+      }
+      .affil a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      .affil a:hover {
+        text-decoration: underline;
+      }
+      .note {
+        font-size: 0.78rem;
+        font-style: italic;
+        color: var(--muted);
+        margin: 0.9rem 0 0;
+      }
+
+      /* ---- abstract ---------------------------------------------------- */
+      .abstract {
+        margin: 0 auto 2.75rem;
+        max-width: 37rem;
+        padding: 1.05rem 0;
+        border-top: 0.5px solid var(--rule-soft);
+        border-bottom: 0.5px solid var(--rule-soft);
+      }
+      .abstract h2 {
+        font-size: 0.8rem;
+        font-variant: small-caps;
+        letter-spacing: 0.09em;
+        font-weight: 600;
+        margin: 0 0 0.5rem;
+        color: var(--ink);
+      }
+      .abstract p {
+        margin: 0;
+        font-size: 0.92rem;
+        line-height: 1.55;
+        color: var(--ink-2);
+        text-align: justify;
+        hyphens: auto;
+      }
+
+      /* ---- body -------------------------------------------------------- */
+      section {
+        margin-bottom: 2.1rem;
+      }
+      h2.sec {
+        font-size: 1.02rem;
+        font-weight: 600;
+        margin: 2.1rem 0 0.6rem;
+        letter-spacing: 0.002em;
+      }
+      h2.sec .num {
+        margin-right: 0.5em;
+      }
+      h3.sub {
+        font-size: 0.94rem;
+        font-weight: 600;
+        font-style: italic;
+        margin: 1.3rem 0 0.4rem;
+      }
+
+      /* Journal setting: paragraphs run on, with a first-line indent instead
+     of a blank line. The first paragraph after a heading is not indented. */
+      p {
+        margin: 0;
+        text-align: justify;
+        hyphens: auto;
+      }
+      p + p {
+        text-indent: 1.4em;
+      }
+      .lead {
+        text-indent: 0 !important;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      ul.tight {
+        padding-left: 1.2rem;
+        margin: 0.6rem 0 0;
+      }
+      ul.tight li {
+        margin-bottom: 0.4rem;
+        text-align: justify;
+        hyphens: auto;
+      }
+
+      code,
+      .mono {
+        font-family: var(--mono);
+        font-size: 0.84em;
+      }
+
+      /* ---- tables: booktabs. Horizontal rules only, never verticals. ---- */
+      .tablewrap {
+        overflow-x: auto;
+        margin: 0.5rem 0 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.85rem;
+        font-variant-numeric: tabular-nums;
+      }
+      thead th {
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 0.42rem 0.7rem;
+        text-align: right;
+        white-space: nowrap;
+        border-top: 1.1px solid var(--ink);
+        border-bottom: 0.5px solid var(--rule);
+      }
+      tbody td {
+        padding: 0.38rem 0.7rem;
+        text-align: right;
+        white-space: nowrap;
+        color: var(--ink-2);
+      }
+      tbody tr:last-child td {
+        border-bottom: 1.1px solid var(--ink);
+      }
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+      .pass {
+        color: var(--muted);
+        font-style: italic;
+      }
+      .swatch {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 0.45rem;
+        vertical-align: 0.03em;
+      }
+      .sw-a {
+        background: var(--sa);
+      }
+      .sw-b {
+        background: var(--sb);
+      }
+
+      /* ---- captions: run-in bold label, journal style ------------------ */
+      .tcap,
+      figcaption {
+        font-size: 0.8rem;
+        line-height: 1.5;
+        color: var(--ink-2);
+        text-align: justify;
+        hyphens: auto;
+      }
+      .tcap {
+        margin: 1.5rem 0 0;
+      }
+      figcaption {
+        margin-top: 0.7rem;
+      }
+      .tcap b,
+      figcaption b {
+        font-weight: 600;
+        color: var(--ink);
+      }
+
+      /* ---- figures: set on the paper, no card, no border --------------- */
+      figure {
+        margin: 1.9rem 0;
+        padding: 0;
+      }
+      .breakout {
+        width: min(52rem, calc(100vw - 3rem));
+        margin-left: 50%;
+        transform: translateX(-50%);
+      }
+      .plot {
+        overflow-x: auto;
+        padding: 0;
+        background: var(--paper);
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.9rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0 0.4rem 0.7rem;
+        font-size: 0.74rem;
+        color: var(--ink-2);
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .lswatch {
+        width: 9px;
+        height: 9px;
+        display: inline-block;
+      }
+      .lline {
+        width: 14px;
+        height: 0;
+        border-top: 1.2px dashed var(--muted);
+        display: inline-block;
+      }
+      .lband {
+        width: 14px;
+        height: 9px;
+        background: var(--band);
+        border: 0.5px solid var(--rule);
+        display: inline-block;
+      }
+
+      /* ---- the finding: rules above and below, no coloured bar --------- */
+      .finding {
+        margin: 1.5rem 0;
+        padding: 0.95rem 0;
+        border-top: 0.5px solid var(--rule);
+        border-bottom: 0.5px solid var(--rule);
+        background: none;
+      }
+      .finding p {
+        font-size: 0.93rem;
+        text-indent: 0;
+      }
+      .finding p + p {
+        margin-top: 0.6rem;
+        text-indent: 1.4em;
+      }
+
+      /* ---- references -------------------------------------------------- */
+      .refs {
+        list-style: none;
+        padding: 0;
+        margin: 0.5rem 0 0;
+        counter-reset: r;
+        font-size: 0.83rem;
+      }
+      .refs li {
+        counter-increment: r;
+        padding-left: 1.9rem;
+        position: relative;
+        margin-bottom: 0.5rem;
+        color: var(--ink-2);
+        line-height: 1.45;
+      }
+      .refs li::before {
+        content: "[" counter(r) "]";
+        position: absolute;
+        left: 0;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+
+      .colophon {
+        margin-top: 3rem;
+        padding-top: 0.9rem;
+        border-top: 0.5px solid var(--rule-soft);
+        font-size: 0.76rem;
+        color: var(--muted);
+        text-align: left;
+      }
+      .colophon a {
+        color: var(--accent);
+      }
+
+      /* ---- chart internals: serif throughout, to match the text -------- */
+      .ax {
+        stroke: var(--ink);
+        stroke-width: 0.8;
+      }
+      .grid {
+        stroke: var(--rule-soft);
+        stroke-width: 0.8;
+      }
+      .tick {
+        fill: var(--muted);
+        font-family: var(--serif);
+        font-size: 10.5px;
+        font-variant-numeric: tabular-nums;
+      }
+      .rowlab {
+        fill: var(--ink-2);
+        font-family: var(--serif);
+        font-size: 11.5px;
+      }
+      .panlab {
+        fill: var(--ink);
+        font-family: var(--serif);
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+      .axtitle {
+        fill: var(--muted);
+        font-family: var(--serif);
+        font-size: 10px;
+        font-variant: small-caps;
+        letter-spacing: 0.05em;
+      }
+      .vlab {
+        fill: var(--ink);
+        font-family: var(--serif);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .tip {
+        position: fixed;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.1s;
+        background: var(--ink);
+        color: var(--paper);
+        font-family: var(--serif);
+        font-size: 12px;
+        line-height: 1.45;
+        padding: 0.4rem 0.55rem;
+        z-index: 50;
+        white-space: pre;
+        font-variant-numeric: tabular-nums;
+        box-shadow: 0 2px 10px rgba(16, 20, 24, 0.18);
+      }
+      .hit {
+        fill: transparent;
+        cursor: crosshair;
+      }
+
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 640px) {
+        body {
+          font-size: 16px;
+        }
+        .sheet {
+          padding: 1.5rem 1.15rem 3.5rem;
+        }
+        .breakout {
+          width: calc(100vw - 2.3rem);
+        }
+        p {
+          text-align: left;
+        }
+        .abstract p,
+        .tcap,
+        figcaption,
+        ul.tight li {
+          text-align: left;
+        }
+        .runhead {
+          font-size: 0.66rem;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+      @media print {
+        .tip {
+          display: none;
+        }
+        .sheet {
+          max-width: none;
+          padding: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <header class="runhead">
+        <span>Abujabal &middot; Reproducing ResNet on CIFAR-10</span>
+        <span>August 2026</span>
+      </header>
+
+      <header class="masthead">
+        <h1>
+          Reproducing ResNet on CIFAR-10, and a null result for pre-activation
+          at depth 56
+        </h1>
+        <p class="byline">Amro Abujabal</p>
+        <p class="affil">
+          Independent work &middot;
+          <a href="https://github.com/AmroAbujabal/resnet-cifar-repro"
+            >github.com/AmroAbujabal/resnet-cifar-repro</a
+          >
+        </p>
+        <p class="note">
+          Independent reproduction, not peer reviewed. Every number on this page
+          is read from the results file produced by the linked code.
+        </p>
+      </header>
+
+      <div class="abstract">
+        <h2>Abstract</h2>
+        <p>
+          We reproduce the CIFAR-10 results of He et al. [1] for ResNet-20 and
+          ResNet-56 from scratch, and obtain
+          <span class="mono">8.39 &plusmn; 0.31%</span> and
+          <span class="mono">7.45 &plusmn; 0.69%</span> test error over three
+          seeds against the paper's <span class="mono">8.75%</span> and
+          <span class="mono">6.97%</span>, both inside a pre-registered
+          &plusmn;0.5% tolerance. We then run a controlled 2&times;2 comparing
+          the original residual block against the full pre-activation block of
+          He et al. [2] across CIFAR-10 and CIFAR-100, holding seeds, schedule,
+          augmentation and parameter count fixed. Pre-activation produces no
+          measurable change in test error at this depth: the differences are
+          <span class="mono">&minus;0.23%</span> and
+          <span class="mono">+0.22%</span>, each well under the combined
+          standard deviation, and they point in opposite directions. We report
+          this as a null result and argue it is the expected outcome, since the
+          advantage documented in [2] emerges at far greater depth.
+        </p>
+      </div>
+
+      <section>
+        <h2 class="sec"><span class="num">1</span> What was done</h2>
+        <p class="lead">
+          Two claims are separable here, and only the first is a reproduction.
+        </p>
+        <p>
+          The first is that the CIFAR-10 error rates in Table 6 of [1] can be
+          recovered from the paper's description alone. That is a reproduction
+          claim, and it is tested against a tolerance fixed before any model was
+          trained.
+        </p>
+        <p>
+          The second is an extension. Having a working baseline makes it cheap
+          to ask whether the pre-activation block of [2] improves on the
+          original at a depth where the original still trains well. That
+          question has no paper number to match, so nothing in Section 4 is a
+          reproduction claim. It is a controlled internal comparison.
+        </p>
+        <p>
+          Everything was written test-first against the paper text. The
+          reference implementation of Idelbayev [3] was consulted for the Option
+          A shortcut convention but not copied. The ImageNet-stem ResNet in
+          torchvision is a different architecture and was deliberately not used.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sec"><span class="num">2</span> Method</h2>
+        <p>
+          The CIFAR architecture is the one specified in Section 4.2 of [1].
+          Inputs are 32&times;32 with per-pixel mean subtracted. A 3&times;3
+          convolution producing 16 channels is followed by 6<i>n</i> layers
+          arranged as three stages of <i>n</i> residual blocks at 16, 32 and 64
+          channels, with stride 2 at each stage change, then global average
+          pooling and a fully connected layer. Total depth is 6<i>n</i>+2. We
+          use <i>n</i>=3 (ResNet-20) and <i>n</i>=9 (ResNet-56).
+        </p>
+        <p>
+          Shortcuts use Option A: when a stage changes dimension, the shortcut
+          subsamples spatially with stride 2 and zero-pads the new channels, so
+          the network stays entirely free of projection parameters. Parameter
+          counts match Table 6 of [1] exactly, which is checked in the test
+          suite rather than by inspection.
+        </p>
+
+        <h3 class="sub">Optimisation</h3>
+        <p>
+          SGD with momentum 0.9, weight decay
+          <span class="mono">1e-4</span> applied to all parameters, batch size
+          128, and 64,000 iterations on the full 50,000 image training split.
+          The learning rate starts at 0.1 and is divided by 10 at iterations
+          32,000 and 48,000. Augmentation is 4-pixel padding, a random
+          32&times;32 crop and a random horizontal flip, with no colour
+          augmentation. Evaluation is single-view on the 10,000 image test
+          split.
+        </p>
+
+        <h3 class="sub">Protocol</h3>
+        <p>
+          Every configuration runs seeds 0, 1 and 2, and every reported figure
+          is a mean with a sample standard deviation over those three runs. Each
+          run appends one row to a single results file at completion, and every
+          number on this page is read from that file. No result was transcribed
+          by hand.
+        </p>
+        <p>
+          The definition of done for the reproduction was set in advance: the
+          mean over at least three seeds must fall within 0.5 percentage points
+          of the paper's error.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sec"><span class="num">3</span> Reproduction</h2>
+
+        <p class="tcap">
+          <b>Table 1</b> CIFAR-10 test error against He et al. [1] Table 6.
+          Three seeds per model, mean and sample standard deviation.
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th class="num">Params</th>
+                <th class="num">Paper</th>
+                <th class="num">This work</th>
+                <th class="num">&Delta;</th>
+                <th class="num">Per-seed error</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>ResNet-20</td>
+                <td class="num">269,722</td>
+                <td class="num">8.75%</td>
+                <td class="num">8.39 &plusmn; 0.31%</td>
+                <td class="num">&minus;0.36</td>
+                <td class="num">8.30 / 8.13 / 8.73</td>
+              </tr>
+              <tr>
+                <td>ResNet-56</td>
+                <td class="num">853,018</td>
+                <td class="num">6.97%</td>
+                <td class="num">7.45 &plusmn; 0.69%</td>
+                <td class="num">+0.48</td>
+                <td class="num">6.91 / 7.21 / 8.22</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="breakout">
+          <div class="plot">
+            <div class="legend">
+              <span
+                ><i class="lswatch" style="background: var(--sa)"></i> mean over
+                3 seeds</span
+              >
+              <span
+                ><i
+                  class="lswatch"
+                  style="
+                    background: var(--sa);
+                    opacity: 0.42;
+                    border-radius: 50%;
+                  "
+                ></i>
+                individual seed</span
+              >
+              <span><i class="lline"></i> paper</span>
+              <span><i class="lband"></i> &plusmn;0.5% tolerance</span>
+            </div>
+            <svg
+              id="fig1"
+              viewBox="0 0 760 210"
+              width="100%"
+              role="img"
+              aria-label="Reproduced CIFAR-10 error for ResNet-20 and ResNet-56 against the paper values, with the tolerance band."
+            ></svg>
+          </div>
+          <figcaption>
+            <b>Figure 1</b> Both models land inside the tolerance band, but not
+            equally comfortably. ResNet-56 clears it by 0.02 percentage points,
+            and the reason is visible: its seed 2 sits far to the right of the
+            other two. The horizontal bar through each mean spans one standard
+            deviation.
+          </figcaption>
+        </figure>
+
+        <p>
+          Both models meet the criterion. ResNet-20 is comfortably inside,
+          landing slightly better than the paper. ResNet-56 passes by a margin
+          of 0.02 percentage points, which is small enough that it deserves
+          stating rather than rounding away.
+        </p>
+        <p>
+          The cause is a single run. Seeds 0 and 1 give 6.91% and 7.21%,
+          straddling the paper's 6.97% closely, and on those alone the match
+          would look tight. Seed 2 gives 8.22%, which is 1.3 points worse than
+          seed 0 and well outside the pair. That one trajectory lifts the mean
+          and doubles the standard deviation. A deeper network being harder to
+          optimise is a plausible reading, and so is ordinary variance, and
+          three seeds cannot separate the two.
+        </p>
+        <p>
+          The honest summary is that the reproduction succeeds on the stated
+          criterion, and that ResNet-56's interval is wide enough to overlap the
+          paper's value rather than pin it.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sec">
+          <span class="num">4</span> Pre-activation at fixed budget
+        </h2>
+        <p>
+          He et al. [2] rearrange the residual block so that batch normalisation
+          and ReLU precede each convolution, leaving the shortcut as a clean
+          identity path. We compare that block against the original across two
+          datasets, holding the seed set, schedule, augmentation and parameter
+          count fixed.
+        </p>
+        <p>
+          The parameter budget is not approximately equal, it is identical.
+          Moving the stem normalisation to a head normalisation on 64 channels
+          costs 96 parameters, and the two dimension-changing blocks return
+          exactly 96 by normalising input rather than output channels. Both
+          variants have 853,018 parameters at <i>n</i>=9.
+        </p>
+        <p>
+          One detail decides whether this is the block from [2] at all. At a
+          dimension-changing block the shared normalisation and activation are
+          applied before the branch splits, so the Option A shortcut subsamples
+          the activated signal rather than the raw input. Building it the other
+          way trains without complaint and looks healthy in the loss curve while
+          quietly being a different architecture, so the distinction is pinned
+          by a test.
+        </p>
+
+        <p class="tcap">
+          <b>Table 2</b> The 2&times;2. Three seeds per cell, twelve runs total.
+          CIFAR-100 has no baseline in [1], so those two rows are an internal
+          comparison and not a reproduction claim.
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Block</th>
+                <th>Dataset</th>
+                <th class="num">Test error</th>
+                <th class="num">Per-seed error</th>
+                <th class="num">Train error</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><i class="swatch sw-a"></i>Original</td>
+                <td>CIFAR-10</td>
+                <td class="num">7.45 &plusmn; 0.69%</td>
+                <td class="num">6.91 / 7.21 / 8.22</td>
+                <td class="num pass">not measured</td>
+              </tr>
+              <tr>
+                <td><i class="swatch sw-b"></i>Pre-activation</td>
+                <td>CIFAR-10</td>
+                <td class="num">7.22 &plusmn; 0.29%</td>
+                <td class="num">7.08 / 7.03 / 7.55</td>
+                <td class="num">0.02 to 0.03%</td>
+              </tr>
+              <tr>
+                <td><i class="swatch sw-a"></i>Original</td>
+                <td>CIFAR-100</td>
+                <td class="num">29.75 &plusmn; 0.42%</td>
+                <td class="num">29.33 / 30.16 / 29.77</td>
+                <td class="num">0.51 to 0.64%</td>
+              </tr>
+              <tr>
+                <td><i class="swatch sw-b"></i>Pre-activation</td>
+                <td>CIFAR-100</td>
+                <td class="num">29.97 &plusmn; 0.37%</td>
+                <td class="num">29.96 / 30.35 / 29.61</td>
+                <td class="num">0.48 to 0.49%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="breakout">
+          <div class="plot">
+            <div class="legend">
+              <span
+                ><i class="lswatch" style="background: var(--sa)"></i> original
+                block</span
+              >
+              <span
+                ><i class="lswatch" style="background: var(--sb)"></i>
+                pre-activation block</span
+              >
+              <span
+                >filled marker: mean &middot; hollow: individual seed &middot;
+                bar: &plusmn;1 s.d.</span
+              >
+            </div>
+            <svg
+              id="fig2"
+              viewBox="0 0 760 230"
+              width="100%"
+              role="img"
+              aria-label="Per-seed test error for both blocks on CIFAR-10 and CIFAR-100, showing overlapping intervals in both panels."
+            ></svg>
+          </div>
+          <figcaption>
+            <b>Figure 2</b> The two blocks are drawn on separate scales because
+            the datasets differ by a factor of four in error. In both panels the
+            standard deviation bars overlap heavily, and the seed clouds
+            interleave. Note that the ordering reverses between panels.
+          </figcaption>
+        </figure>
+
+        <div class="finding">
+          <p>
+            <b>Finding.</b> At depth 56, the pre-activation block produces no
+            measurable change in test error. On CIFAR-10 it is 0.23 points
+            better, on CIFAR-100 it is 0.22 points worse. The combined standard
+            deviations are 0.74 and 0.56, so each difference is 0.31 and 0.39 of
+            the noise.
+          </p>
+          <p>
+            The sign reversal is the substantive part. A real effect of that
+            magnitude would not flip direction between two datasets run under an
+            identical protocol. Two differences that are small individually and
+            contradictory jointly are better described as an absence of signal
+            than as a weak signal.
+          </p>
+        </div>
+
+        <p>
+          This agrees with [2], which is the point of running it. The comparison
+          in that paper at depth 110 on CIFAR-10 is close to even between the
+          two blocks; the advantage that motivates pre-activation appears at
+          1001 layers, where the identity path's effect on gradient flow stops
+          being marginal. Depth 56 is well below that regime, so a null is what
+          the source paper predicts. The experiment confirms the boundary of the
+          claim rather than the claim itself.
+        </p>
+
+        <h3 class="sub">On spread</h3>
+        <p>
+          One asymmetry survives, and it is deliberately reported as an
+          observation rather than a result. Pre-activation has the smaller
+          standard deviation in both panels, 0.29 against 0.69 on CIFAR-10 and
+          0.37 against 0.42 on CIFAR-100, and the widest single excursion in the
+          whole matrix is the original block's CIFAR-10 seed 2. Easier
+          optimisation is exactly the story [2] tells, so the direction is
+          suggestive. Comparing dispersions from three samples per cell is weak
+          evidence, and no further seeds were run, because adding seeds until a
+          difference clears a threshold tests the experimenter rather than the
+          network.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sec"><span class="num">5</span> Training behaviour</h2>
+        <p>
+          The CIFAR-100 cells fit their training data essentially completely.
+          Train error settles between 0.48% and 0.64% across both blocks while
+          test error stays near 30%, so what remains is generalisation gap and
+          not underfitting. Both blocks reach that same fully fitted state,
+          which is consistent with the null: they are not separated by
+          optimisation capacity at this depth.
+        </p>
+
+        <figure class="breakout">
+          <div class="plot">
+            <div class="legend">
+              <span
+                ><i class="lswatch" style="background: var(--sb)"></i>
+                pre-activation ResNet-56 on CIFAR-100, seeds 0 to 2</span
+              >
+              <span><i class="lline"></i> learning rate step</span>
+            </div>
+            <svg
+              id="fig3"
+              viewBox="0 0 760 260"
+              width="100%"
+              role="img"
+              aria-label="Test error against training iteration for three seeds, showing a large drop at the first learning rate step."
+            ></svg>
+          </div>
+          <figcaption>
+            <b>Figure 3</b> Test error against iteration, evaluated every 8,000
+            steps. The first learning rate step at 32,000 iterations produces
+            almost all of the final gain, moving all three seeds from roughly
+            39% to roughly 30% within one evaluation interval. The second step
+            at 48,000 changes little. Curves are shown for the one configuration
+            whose full evaluation log was retained.
+          </figcaption>
+        </figure>
+
+        <p>
+          The shape is the familiar one from [1]: a long noisy plateau at the
+          initial learning rate, a step change when it drops, then a short flat
+          tail. It is worth noting that the second decay contributes almost
+          nothing here, which suggests the schedule could be shortened without
+          much cost, though that was not tested.
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sec"><span class="num">6</span> Limitations</h2>
+        <ul class="tight">
+          <li>
+            <b>Three seeds.</b> Three is the minimum this work committed to in
+            advance, not a number chosen because it suffices to characterise the
+            tail. ResNet-56's standard deviation of 0.69 shows what that costs.
+          </li>
+          <li>
+            <b>One depth.</b> The 2&times;2 tests one depth. It says nothing
+            about pre-activation at 110 or 1001 layers, which is where [2]
+            locates its effect.
+          </li>
+          <li>
+            <b>No CIFAR-100 baseline.</b> Table 6 of [1] is CIFAR-10 only. The
+            CIFAR-100 cells are internally controlled but externally unanchored.
+          </li>
+          <li>
+            <b>Absence of evidence.</b> A null over three seeds bounds the
+            effect at roughly the size of the noise. It does not establish that
+            the two blocks are identical, only that any difference at this depth
+            is smaller than this experiment can see.
+          </li>
+          <li>
+            <b>Hardware.</b> All runs used a single T4. Numbers are single-view
+            test error, with no ensembling and no test-time augmentation.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="sec"><span class="num">7</span> Reproducing this</h2>
+        <p>
+          The repository holds the model, the training loop, the configuration
+          for each of the five cells, the notebook that runs them, and the
+          results file every number here is read from. The test suite covers the
+          data pipeline, the metric, the model builder, an overfitting gate and
+          the parameter counts, and it runs before any training does, so a typo
+          fails in seconds instead of two hours into a GPU run.
+        </p>
+        <p>
+          Total cost was about 26 GPU-hours of training across 15 runs. Each
+          configuration ran as one job, because a job killed at the session
+          limit loses its output entirely.
+        </p>
+        <p class="mono" style="margin-top: 1.2rem">
+          <a href="https://github.com/AmroAbujabal/resnet-cifar-repro"
+            >github.com/AmroAbujabal/resnet-cifar-repro</a
+          >
+        </p>
+      </section>
+
+      <section>
+        <h2 class="sec"><span class="num">8</span> References</h2>
+        <ol class="refs">
+          <li>
+            K. He, X. Zhang, S. Ren, J. Sun.
+            <i>Deep Residual Learning for Image Recognition.</i>
+            arXiv:1512.03385, 2015.
+          </li>
+          <li>
+            K. He, X. Zhang, S. Ren, J. Sun.
+            <i>Identity Mappings in Deep Residual Networks.</i>
+            arXiv:1603.05027, 2016.
+          </li>
+          <li>
+            Y. Idelbayev.
+            <i
+              >Proper ResNet implementation for CIFAR-10/CIFAR-100 in
+              PyTorch.</i
+            >
+            Consulted for the Option A shortcut convention.
+          </li>
+        </ol>
+      </section>
+
+      <p class="colophon">
+        Figures rendered from <span class="mono">results.csv</span> in the
+        linked repository. Reproduction target and seed count were fixed before
+        training began.
+      </p>
+    </div>
+
+    <div class="tip" id="tip"></div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        var SVGNS = "http://www.w3.org/2000/svg";
+        var tip = document.getElementById("tip");
+
+        function el(name, attrs, parent) {
+          var n = document.createElementNS(SVGNS, name);
+          for (var k in attrs)
+            if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+          if (parent) parent.appendChild(n);
+          return n;
+        }
+        function mean(a) {
+          return (
+            a.reduce(function (x, y) {
+              return x + y;
+            }, 0) / a.length
+          );
+        }
+        function sd(a) {
+          var m = mean(a);
+          return Math.sqrt(
+            a.reduce(function (s, v) {
+              return s + (v - m) * (v - m);
+            }, 0) /
+              (a.length - 1),
+          );
+        }
+        function fmt(v, d) {
+          return v.toFixed(d === undefined ? 2 : d);
+        }
+
+        function showTip(evt, text) {
+          tip.textContent = text;
+          tip.style.opacity = "1";
+          var pad = 14;
+          var x = evt.clientX + pad,
+            y = evt.clientY + pad;
+          var r = tip.getBoundingClientRect();
+          if (x + r.width > window.innerWidth - 8)
+            x = evt.clientX - r.width - pad;
+          if (y + r.height > window.innerHeight - 8)
+            y = evt.clientY - r.height - pad;
+          tip.style.left = x + "px";
+          tip.style.top = y + "px";
+        }
+        function hideTip() {
+          tip.style.opacity = "0";
+        }
+
+        function attach(node, text) {
+          node.addEventListener("mousemove", function (e) {
+            showTip(e, text);
+          });
+          node.addEventListener("mouseleave", hideTip);
+        }
+
+        // ---------------------------------------------------------------- data
+        var REPRO = [
+          { label: "ResNet-20", paper: 8.75, seeds: [8.3, 8.13, 8.73] },
+          { label: "ResNet-56", paper: 6.97, seeds: [6.91, 7.21, 8.22] },
+        ];
+
+        var MATRIX = [
+          {
+            panel: "CIFAR-10",
+            lo: 6.4,
+            hi: 8.6,
+            step: 0.5,
+            rows: [
+              {
+                label: "original",
+                color: "var(--sa)",
+                seeds: [6.91, 7.21, 8.22],
+              },
+              {
+                label: "pre-act",
+                color: "var(--sb)",
+                seeds: [7.08, 7.03, 7.55],
+              },
+            ],
+          },
+          {
+            // Same 2.2 point span as the CIFAR-10 panel, so a bar of equal
+            // width means an equal spread in both panels.
+            panel: "CIFAR-100",
+            lo: 28.9,
+            hi: 31.1,
+            step: 0.5,
+            rows: [
+              {
+                label: "original",
+                color: "var(--sa)",
+                seeds: [29.33, 30.16, 29.77],
+              },
+              {
+                label: "pre-act",
+                color: "var(--sb)",
+                seeds: [29.96, 30.35, 29.61],
+              },
+            ],
+          },
+        ];
+
+        var CURVES = [
+          [
+            [8000, 46.78],
+            [16000, 41.14],
+            [24000, 38.33],
+            [32000, 38.1],
+            [40000, 29.7],
+            [48000, 30.51],
+            [56000, 29.93],
+            [64000, 29.96],
+          ],
+          [
+            [8000, 48.16],
+            [16000, 41.96],
+            [24000, 43.41],
+            [32000, 39.8],
+            [40000, 30.64],
+            [48000, 30.98],
+            [56000, 30.12],
+            [64000, 30.35],
+          ],
+          [
+            [8000, 44.43],
+            [16000, 41.19],
+            [24000, 41.41],
+            [32000, 38.84],
+            [40000, 29.81],
+            [48000, 30.27],
+            [56000, 29.53],
+            [64000, 29.61],
+          ],
+        ];
+
+        // ---------------------------------------------------- Figure 1: repro
+        function figure1() {
+          var svg = document.getElementById("fig1");
+          var W = 760,
+            H = 210,
+            L = 92,
+            R = 28,
+            T = 34,
+            B = 42;
+          var lo = 6.2,
+            hi = 9.3;
+          var x = function (v) {
+            return L + ((v - lo) / (hi - lo)) * (W - L - R);
+          };
+
+          // tolerance bands, drawn first so marks sit on top
+          REPRO.forEach(function (d, i) {
+            var yc =
+              T +
+              i * ((H - T - B) / REPRO.length) +
+              (H - T - B) / (2 * REPRO.length);
+            el(
+              "rect",
+              {
+                x: x(d.paper - 0.5),
+                y: yc - 30,
+                width: x(d.paper + 0.5) - x(d.paper - 0.5),
+                height: 60,
+                fill: "var(--band)",
+                stroke: "var(--rule)",
+                "stroke-dasharray": "3 3",
+                rx: 2,
+              },
+              svg,
+            );
+          });
+
+          // axis
+          for (var v = 6.5; v <= 9.2; v += 0.5) {
+            el(
+              "line",
+              { x1: x(v), y1: T - 8, x2: x(v), y2: H - B, class: "grid" },
+              svg,
+            );
+            var t = el(
+              "text",
+              {
+                x: x(v),
+                y: H - B + 16,
+                class: "tick",
+                "text-anchor": "middle",
+              },
+              svg,
+            );
+            t.textContent = fmt(v, 1);
+          }
+          el(
+            "line",
+            { x1: L, y1: H - B, x2: W - R, y2: H - B, class: "ax" },
+            svg,
+          );
+          var at = el(
+            "text",
+            {
+              x: (L + W - R) / 2,
+              y: H - 8,
+              class: "axtitle",
+              "text-anchor": "middle",
+            },
+            svg,
+          );
+          at.textContent = "TEST ERROR (%)";
+
+          REPRO.forEach(function (d, i) {
+            var band = (H - T - B) / REPRO.length;
+            var yc = T + i * band + band / 2;
+            var m = mean(d.seeds),
+              s = sd(d.seeds);
+
+            var lab = el(
+              "text",
+              { x: L - 14, y: yc + 4, class: "rowlab", "text-anchor": "end" },
+              svg,
+            );
+            lab.textContent = d.label;
+
+            // paper reference
+            el(
+              "line",
+              {
+                x1: x(d.paper),
+                y1: yc - 30,
+                x2: x(d.paper),
+                y2: yc + 30,
+                stroke: "var(--muted)",
+                "stroke-width": 1.5,
+                "stroke-dasharray": "4 3",
+              },
+              svg,
+            );
+            var pl = el(
+              "text",
+              {
+                x: x(d.paper),
+                y: yc - 36,
+                class: "tick",
+                "text-anchor": "middle",
+              },
+              svg,
+            );
+            pl.textContent = "paper " + fmt(d.paper);
+
+            // sd bar
+            el(
+              "line",
+              {
+                x1: x(m - s),
+                y1: yc,
+                x2: x(m + s),
+                y2: yc,
+                stroke: "var(--sa)",
+                "stroke-width": 3,
+                opacity: 0.4,
+                "stroke-linecap": "round",
+              },
+              svg,
+            );
+
+            // seeds. Filled with the surface colour so two near-coincident
+            // markers stay countable instead of merging into one blob.
+            d.seeds.forEach(function (v, k) {
+              var c = el(
+                "circle",
+                {
+                  cx: x(v),
+                  cy: yc,
+                  r: 5,
+                  fill: "var(--surface)",
+                  stroke: "var(--sa)",
+                  "stroke-width": 1.8,
+                  opacity: 0.9,
+                },
+                svg,
+              );
+              attach(
+                c,
+                d.label + "  seed " + k + "\n" + fmt(v) + "% test error",
+              );
+            });
+
+            // mean
+            var mk = el(
+              "circle",
+              {
+                cx: x(m),
+                cy: yc,
+                r: 6.5,
+                fill: "var(--sa)",
+                stroke: "var(--surface)",
+                "stroke-width": 1.5,
+              },
+              svg,
+            );
+            attach(
+              mk,
+              d.label +
+                "  mean of 3 seeds\n" +
+                fmt(m) +
+                " +/- " +
+                fmt(s) +
+                "%\npaper " +
+                fmt(d.paper) +
+                "%, delta " +
+                (m - d.paper >= 0 ? "+" : "") +
+                fmt(m - d.paper),
+            );
+
+            var vl = el(
+              "text",
+              { x: x(m), y: yc + 24, class: "vlab", "text-anchor": "middle" },
+              svg,
+            );
+            vl.textContent = fmt(m) + " ± " + fmt(s);
+          });
+        }
+
+        // ------------------------------------------------- Figure 2: the 2x2
+        function figure2() {
+          var svg = document.getElementById("fig2");
+          var W = 760,
+            H = 230,
+            T = 40,
+            B = 46,
+            GAP = 74;
+          // RM keeps the right panel off the viewBox edge, so its last tick
+          // label is not clipped.
+          var RM = 24;
+          var panelW = (W - GAP - 96 * 2 - RM) / 2;
+
+          MATRIX.forEach(function (p, pi) {
+            var L = 96 + pi * (panelW + GAP + 96);
+            var x = function (v) {
+              return L + ((v - p.lo) / (p.hi - p.lo)) * panelW;
+            };
+
+            var pt = el("text", { x: L, y: 16, class: "panlab" }, svg);
+            pt.textContent = p.panel.toUpperCase();
+
+            for (
+              var v = Math.ceil(p.lo / p.step) * p.step;
+              v <= p.hi;
+              v += p.step
+            ) {
+              el(
+                "line",
+                { x1: x(v), y1: T - 6, x2: x(v), y2: H - B, class: "grid" },
+                svg,
+              );
+              var t = el(
+                "text",
+                {
+                  x: x(v),
+                  y: H - B + 16,
+                  class: "tick",
+                  "text-anchor": "middle",
+                },
+                svg,
+              );
+              t.textContent = fmt(v, 1);
+            }
+            el(
+              "line",
+              { x1: L, y1: H - B, x2: L + panelW, y2: H - B, class: "ax" },
+              svg,
+            );
+            var at = el(
+              "text",
+              {
+                x: L + panelW / 2,
+                y: H - 10,
+                class: "axtitle",
+                "text-anchor": "middle",
+              },
+              svg,
+            );
+            at.textContent = "TEST ERROR (%)";
+
+            p.rows.forEach(function (r, i) {
+              var band = (H - T - B) / p.rows.length;
+              var yc = T + i * band + band / 2;
+              var m = mean(r.seeds),
+                s = sd(r.seeds);
+
+              var lab = el(
+                "text",
+                { x: L - 12, y: yc + 4, class: "rowlab", "text-anchor": "end" },
+                svg,
+              );
+              lab.textContent = r.label;
+
+              el(
+                "line",
+                {
+                  x1: x(m - s),
+                  y1: yc,
+                  x2: x(m + s),
+                  y2: yc,
+                  stroke: r.color,
+                  "stroke-width": 2.5,
+                  opacity: 0.32,
+                  "stroke-linecap": "round",
+                },
+                svg,
+              );
+
+              r.seeds.forEach(function (v, k) {
+                var c = el(
+                  "circle",
+                  {
+                    cx: x(v),
+                    cy: yc,
+                    r: 4.5,
+                    fill: "var(--surface)",
+                    stroke: r.color,
+                    "stroke-width": 1.7,
+                    opacity: 0.9,
+                  },
+                  svg,
+                );
+                attach(
+                  c,
+                  p.panel +
+                    "  " +
+                    r.label +
+                    "  seed " +
+                    k +
+                    "\n" +
+                    fmt(v) +
+                    "% test error",
+                );
+              });
+
+              var mk = el(
+                "circle",
+                {
+                  cx: x(m),
+                  cy: yc,
+                  r: 6,
+                  fill: r.color,
+                  stroke: "var(--surface)",
+                  "stroke-width": 1.5,
+                },
+                svg,
+              );
+              attach(
+                mk,
+                p.panel +
+                  "  " +
+                  r.label +
+                  "\nmean " +
+                  fmt(m) +
+                  " +/- " +
+                  fmt(s) +
+                  "% over 3 seeds",
+              );
+
+              var vl = el(
+                "text",
+                { x: x(m), y: yc - 14, class: "vlab", "text-anchor": "middle" },
+                svg,
+              );
+              vl.textContent = fmt(m);
+            });
+
+            // delta annotation between the two rows
+            var ma = mean(p.rows[0].seeds),
+              mb = mean(p.rows[1].seeds);
+            var comb = Math.sqrt(
+              Math.pow(sd(p.rows[0].seeds), 2) +
+                Math.pow(sd(p.rows[1].seeds), 2),
+            );
+            var d = mb - ma;
+            var dt = el(
+              "text",
+              {
+                x: L + panelW / 2,
+                y: H - B - 8,
+                class: "tick",
+                "text-anchor": "middle",
+              },
+              svg,
+            );
+            dt.textContent =
+              "Δ " +
+              (d >= 0 ? "+" : "−") +
+              fmt(Math.abs(d)) +
+              "  vs  s.d. " +
+              fmt(comb);
+          });
+        }
+
+        // ------------------------------------------- Figure 3: training curves
+        function figure3() {
+          var svg = document.getElementById("fig3");
+          var W = 760,
+            H = 260,
+            L = 56,
+            R = 26,
+            T = 22,
+            B = 44;
+          var xlo = 0,
+            xhi = 66000,
+            ylo = 28,
+            yhi = 50;
+          var x = function (v) {
+            return L + ((v - xlo) / (xhi - xlo)) * (W - L - R);
+          };
+          var y = function (v) {
+            return T + ((yhi - v) / (yhi - ylo)) * (H - T - B);
+          };
+
+          for (var g = 30; g <= 50; g += 5) {
+            el(
+              "line",
+              { x1: L, y1: y(g), x2: W - R, y2: y(g), class: "grid" },
+              svg,
+            );
+            var t = el(
+              "text",
+              { x: L - 10, y: y(g) + 3.5, class: "tick", "text-anchor": "end" },
+              svg,
+            );
+            t.textContent = g;
+          }
+          for (var i = 0; i <= 64000; i += 16000) {
+            var xt = el(
+              "text",
+              {
+                x: x(i),
+                y: H - B + 16,
+                class: "tick",
+                "text-anchor": "middle",
+              },
+              svg,
+            );
+            xt.textContent = i === 0 ? "0" : i / 1000 + "k";
+          }
+          el(
+            "line",
+            { x1: L, y1: H - B, x2: W - R, y2: H - B, class: "ax" },
+            svg,
+          );
+
+          // learning rate steps
+          [32000, 48000].forEach(function (it) {
+            el(
+              "line",
+              {
+                x1: x(it),
+                y1: T,
+                x2: x(it),
+                y2: H - B,
+                stroke: "var(--muted)",
+                "stroke-width": 1.2,
+                "stroke-dasharray": "4 3",
+                opacity: 0.75,
+              },
+              svg,
+            );
+            var lt = el(
+              "text",
+              { x: x(it) + 6, y: T + 11, class: "tick" },
+              svg,
+            );
+            lt.textContent = "lr /10";
+          });
+
+          CURVES.forEach(function (c, si) {
+            var d = c
+              .map(function (p, i) {
+                return (i ? "L" : "M") + x(p[0]) + " " + y(p[1]);
+              })
+              .join(" ");
+            el(
+              "path",
+              {
+                d: d,
+                fill: "none",
+                stroke: "var(--sb)",
+                "stroke-width": 2,
+                opacity: 0.5,
+                "stroke-linejoin": "round",
+                "stroke-linecap": "round",
+              },
+              svg,
+            );
+            c.forEach(function (p) {
+              var dot = el(
+                "circle",
+                {
+                  cx: x(p[0]),
+                  cy: y(p[1]),
+                  r: 3,
+                  fill: "var(--sb)",
+                  opacity: 0.72,
+                },
+                svg,
+              );
+              attach(
+                dot,
+                "seed " +
+                  si +
+                  "  iteration " +
+                  p[0].toLocaleString() +
+                  "\n" +
+                  fmt(p[1]) +
+                  "% test error",
+              );
+            });
+          });
+
+          // Anchored start at the left margin. Anchoring end at L-10 ran the
+          // label off the left edge of the viewBox, which clipped it.
+          var ay = el(
+            "text",
+            { x: 2, y: T - 8, class: "axtitle", "text-anchor": "start" },
+            svg,
+          );
+          ay.textContent = "TEST ERROR (%)";
+          var ax = el(
+            "text",
+            {
+              x: (L + W - R) / 2,
+              y: H - 8,
+              class: "axtitle",
+              "text-anchor": "middle",
+            },
+            svg,
+          );
+          ax.textContent = "TRAINING ITERATION";
+        }
+
+        figure1();
+        figure2();
+        figure3();
+      })();
+    </script>
+  </body>
+</html>
