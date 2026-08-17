@@ -4,17 +4,18 @@ Usage:
     python scripts/train.py --config configs/resnet20.yaml --seed 0
     python scripts/train.py --config configs/resnet56.yaml --seed 0 --device cuda
 
-Every run appends one row to results.csv (the single source of truth for results).
+Every run appends one row to results.csv (the single source of truth for results)
+and writes its full evaluation history to logs/<name>_seed<seed>.csv, which is
+committed: a run whose curve lives only in a session's stdout is a run that
+cannot be explained afterwards.
 """
 import argparse
 import csv
 import os
-import random
 import sys
 import time
 from datetime import datetime, timezone
 
-import numpy as np
 import torch
 import yaml
 
@@ -23,14 +24,7 @@ from src.data import get_loaders  # noqa: E402
 from src.eval import evaluate  # noqa: E402
 from src.metric import top1_error  # noqa: E402
 from src.model import resnet  # noqa: E402
-from src.train import train_step  # noqa: E402
-
-
-def set_seed(seed: int):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+from src.train import set_seed, train_step  # noqa: E402
 
 
 def infinite(loader):
@@ -45,6 +39,7 @@ def main():
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--data-root", default="data")
     ap.add_argument("--results", default="results.csv")
+    ap.add_argument("--log-dir", default="logs", help="per-run evaluation logs (committed)")
     ap.add_argument("--eval-every", type=int, default=8000)
     args = ap.parse_args()
 
@@ -74,7 +69,13 @@ def main():
         for g in opt.param_groups:
             g["lr"] = 0.01
 
-    print(f"{cfg['name']} | seed {args.seed} | {device} | {max_iters} iters")
+    os.makedirs(args.log_dir, exist_ok=True)
+    log_path = os.path.join(args.log_dir, f"{cfg['name']}_seed{args.seed}.csv")
+    log = open(log_path, "w", newline="")
+    log_w = csv.writer(log)
+    log_w.writerow(["iter", "train_error_pct", "test_error_pct"])
+
+    print(f"{cfg['name']} | seed {args.seed} | {device} | {max_iters} iters -> {log_path}")
     start = time.time()
     it, warmed = 0, not warmup
     for x, y in infinite(loaders["train"]):
@@ -93,13 +94,19 @@ def main():
         if it % 1000 == 0:
             print(f"  iter {it:6d}/{max_iters}  loss {loss:.3f}  lr {opt.param_groups[0]['lr']:.4f}")
         if it % args.eval_every == 0 or it >= max_iters:
-            err = evaluate(model, loaders["test"], device)
-            print(f"  [eval] iter {it}: test error {err:.2f}%")
+            test_err = evaluate(model, loaders["test"], device)
+            # Train error on the un-augmented view, at every interval and not only
+            # at the end: an elevated train curve is how an optimisation failure
+            # tells itself apart from a generalisation one afterwards.
+            train_err = evaluate(model, loaders["train_eval"], device)
+            log_w.writerow([it, f"{train_err:.2f}", f"{test_err:.2f}"])
+            log.flush()  # a session killed at its limit must not take the log with it
+            print(f"  [eval] iter {it}: train error {train_err:.2f}%  "
+                  f"test error {test_err:.2f}%")
         if it >= max_iters:
             break
 
-    test_err = evaluate(model, loaders["test"], device)
-    train_err = evaluate(model, loaders["train_eval"], device)  # un-augmented view
+    log.close()
     wall = time.time() - start
     print(f"DONE {cfg['name']} seed {args.seed}: test error {test_err:.2f}%, "
           f"train error {train_err:.2f}% in {wall/60:.1f} min")

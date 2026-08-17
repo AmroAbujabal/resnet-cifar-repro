@@ -8,8 +8,8 @@ Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 ## Status (2026-08-08)
 
 - **Published, public, MIT.** README + one-click Colab notebook.
-- **22 tests pass locally on CPU**; the 11 data tests need CIFAR, which this network cannot fetch,
-  so the full suite (33) runs on cloud GPU — see below.
+- **27 tests pass locally on CPU** (2026-08-16); the 12 data tests need CIFAR, which this network
+  cannot fetch, so the full suite (39) runs on cloud GPU — see below.
 - **Param counts match Table 6 exactly** (ResNet-20 269,722 … ResNet-110 1,727,962).
 - **T1 confirmed green on Colab (2026-08-05).** Locally the CIFAR mirror is unreachable (Toronto
   301→dead `cave` HTTP host; the HTTPS cave endpoint runs ~23 KB/s and never completes — resume
@@ -35,7 +35,13 @@ Repo: https://github.com/AmroAbujabal/resnet-cifar-repro
 
 ## Confirmed decisions (2026-07-03)
 
-- Final models train on **full 50k** (schedule tuned on 45k/5k val).
+- Final models train on **full 50k** (schedule tuned on 45k/5k val). **Verified against the PDF
+  on 2026-08-16 and it matches the paper**: Sec 4.2 says "we present experiments trained on the
+  training set and evaluated on the test set" over "50k training images", and the 45k/5k split
+  appears exactly once, as the source of one hyperparameter — training terminates at 64k
+  iterations, "which is determined on a 45k/5k train/val split". `train_split: 50000` in every
+  config drives `full_train=True` in `scripts/train.py`, so this work trains on the same 50k the
+  paper did. The repro numbers carry no held-out-data advantage; the Method section says so.
 - Second dataset = **CIFAR-100**; comparison model = **pre-activation ResNet-56** (He 2016).
 - Seeds **{0,1,2}**; **Option-A** downsample (strided subsample + channel zero-pad);
   weight decay on **all** params; **no color aug** (pad+crop+flip only).
@@ -96,6 +102,66 @@ Matches He 2016, whose gap opens at 1001 layers, not 56. Pre-act has the smaller
 datasets; that stays an observation at n=3, not a claim. No extra seeds — chasing significance would
 be fitting the experiment to a desired answer.
 
+## Determinism (2026-08-16) — what is and is not pinned on a T4
+
+`src.train.set_seed(seed)` is the one entry point, called by `scripts/train.py` before anything
+touches CUDA. It pins python `random`, numpy, torch CPU and all CUDA devices; sets
+`cudnn.deterministic = True` and `cudnn.benchmark = False` (the autotuner picking a different
+convolution algorithm per launch is the usual reason two identical GPU runs diverge); sets
+`torch.use_deterministic_algorithms(True, warn_only=True)` — `warn_only` on purpose, an op with
+no deterministic kernel should print a warning, not kill a two-hour run at iteration 60k; and
+sets `CUBLAS_WORKSPACE_CONFIG=:4096:8`, which is only read when cuBLAS initialises, hence the
+early call. DataLoader workers: torch seeds each worker's own generator from the parent seed and
+that is what `RandomCrop` / `RandomHorizontalFlip` draw from, so the augmentation stream was
+already deterministic; `_seed_worker` in `src/data.py` additionally seeds python/numpy per worker
+so a future transform that reaches for either cannot silently break it.
+
+**What this does NOT give you:**
+
+- **Bit-identical agreement with the Phase 2 / Phase 3 runs.** Those ran with none of the above,
+  so their conv algorithms were autotuner-chosen. Turning determinism on changes kernel selection,
+  which changes the numerics from the first step. A rerun of `resnet56` seed 2 is a **new draw
+  from the same seed label, not a replay** — it will not land on 8.22% except by coincidence, and
+  that is itself the reportable finding about the original runs.
+- Portability. Same seed on a different GPU, a different torch/cuDNN build, or a different
+  `num_workers` gives a different run. Determinism here means _this_ setup repeats itself.
+- GPU coverage from the test suite. `tests/test_determinism.py` runs on CPU, where determinism is
+  cheap; it pins the seeding logic, not the cuDNN flags. Only a GPU run exercises those.
+
+## Logs and the site build (2026-08-16)
+
+- Every run writes `logs/<name>_seed<seed>.csv` — `iter,train_error_pct,test_error_pct` at each
+  eval interval, flushed per row, **committed**. Phase 2/3 kept no logs, which is why Table 2's
+  original × CIFAR-10 train error reads "not measured" — the one cell whose behaviour is worth
+  explaining. `logs/preact56_c100_seed{0,1,2}.csv` are recovered from the Kaggle version-4 output
+  and have an empty train column: those evaluations only measured test error.
+- Train error is now measured at **every** eval interval, not once at the end. It costs one
+  50k-image forward pass per interval (~8 per run, ≈2% of wall time) and it replaces the duplicate
+  end-of-run evaluation the loop used to do, so a run is no slower than before.
+- `scripts/build_site.py` writes every results-derived number into `site/index.html`: the
+  `data-stat="KEY"` spans in prose and tables, and the figure data block between the `GENERATED`
+  markers. **Never hand-edit a number in the page or inside those markers.** Run the script after
+  any append; `--check` (wired into `tests/test_site.py`) fails if the page has drifted. It
+  compares values, not bytes, because a formatter reflows the file.
+- A duplicate `(model, seed)` in `results.csv` makes `build_site.py` **stop**. A rerun needs an
+  explicit rule for which row the published aggregate uses, and that is a judgement call about
+  what is being claimed, not something to default.
+- **The rule, decided 2026-08-16:** a rerun gets its own config `name` (`resnet56_rerun`), so it
+  never collides and never silently joins a pre-registered aggregate. Table 1, the Phase 2 mean
+  and s.d., and the 2×2 keep meaning what they meant. The rerun supplies the train-error column
+  and the Section 3 discussion only.
+
+## Phase 4 (launched 2026-08-16)
+
+`resnet56_rerun` = `resnet56` with a different name, seed 2 only, under the deterministic setup
+with per-interval logging. It exists because the seed 2 excursion (8.22%, 1.31 points above seed 0) has no train-error curve behind it, so "deeper nets are harder to optimise" and "generalisation
+wobble" are indistinguishable in the published write-up. What the outcome means:
+
+- **~8.2% with elevated train error** → optimisation failure, supports the Section 3 reading.
+- **~8.2% with normal train error** → generalisation wobble; the seed 2 paragraph gets rewritten.
+- **Not ~8.2% at all** → a finding about the original runs' reproducibility. Report it; do not
+  quietly replace the old number. This is the _expected_ outcome — see the determinism section.
+
 ## Kaggle rules (cost real GPU hours when broken)
 
 All four Phase 3 cells are done, so no runs are planned. If one happens anyway:
@@ -104,4 +170,8 @@ All four Phase 3 cells are done, so no runs are planned. If one happens anyway:
   file from the cloned repo, so an unpushed row is a row the next run neither skips nor carries.
 - **Never put two configs in one version** — a run killed at the session limit discards
   `/kaggle/working` entirely.
+- The notebook now passes `--log-dir /kaggle/working/logs`, outside the throwaway clone. Pull
+  `logs/` back and commit it alongside `results.csv`, or the run's curve is lost again.
+- A **rerun** of a seed already in `results.csv` is skipped by the notebook's `done()` guard.
+  Reruns need that guard bypassed deliberately, not edited away by accident.
 - `kernels push` **launches immediately — there is no dry-run.**

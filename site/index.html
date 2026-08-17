@@ -11,7 +11,7 @@
       name="description"
       content="A from-scratch reproduction of He et al.'s CIFAR-10 ResNet results, and a controlled 2x2 finding no measurable benefit from pre-activation at depth 56."
     />
-    <meta name="author" content="Amro Abujabal" />
+    <meta name="author" content="Amr Abujabal" />
     <meta property="og:type" content="article" />
     <meta
       property="og:title"
@@ -510,7 +510,7 @@
           Reproducing ResNet on CIFAR-10, and a null result for pre-activation
           at depth 56
         </h1>
-        <p class="byline">Amro Abujabal</p>
+        <p class="byline">Amr Abujabal</p>
         <p class="affil">
           Independent work &middot;
           <a href="https://github.com/AmroAbujabal/resnet-cifar-repro"
@@ -528,20 +528,22 @@
         <p>
           We reproduce the CIFAR-10 results of He et al. [1] for ResNet-20 and
           ResNet-56 from scratch, and obtain
-          <span class="mono">8.39 &plusmn; 0.31%</span> and
-          <span class="mono">7.45 &plusmn; 0.69%</span> test error over three
-          seeds against the paper's <span class="mono">8.75%</span> and
-          <span class="mono">6.97%</span>, both inside a pre-registered
-          &plusmn;0.5% tolerance. We then run a controlled 2&times;2 comparing
-          the original residual block against the full pre-activation block of
-          He et al. [2] across CIFAR-10 and CIFAR-100, holding seeds, schedule,
-          augmentation and parameter count fixed. Pre-activation produces no
-          measurable change in test error at this depth: the differences are
-          <span class="mono">&minus;0.23%</span> and
-          <span class="mono">+0.22%</span>, each well under the combined
-          standard deviation, and they point in opposite directions. We report
-          this as a null result and argue it is the expected outcome, since the
-          advantage documented in [2] emerges at far greater depth.
+          <span class="mono" data-stat="resnet20.meansd">8.39 ± 0.31%</span> and
+          <span class="mono" data-stat="resnet56.meansd">7.45 ± 0.69%</span>
+          test error over three seeds against the paper's
+          <span class="mono">8.75%</span> and <span class="mono">6.97%</span>,
+          both inside a pre-registered &plusmn;0.5% tolerance. We then run a
+          controlled 2&times;2 comparing the original residual block against the
+          full pre-activation block of He et al. [2] across CIFAR-10 and
+          CIFAR-100, holding seeds, schedule, augmentation and parameter count
+          fixed. Pre-activation produces no measurable change in test error at
+          this depth: the differences are
+          <span class="mono" data-stat="delta.cifar10">−0.23</span>% and
+          <span class="mono" data-stat="delta.cifar100">+0.22</span>%, each well
+          under the combined standard deviation, and they point in opposite
+          directions. We report this as a null result and argue it is the
+          expected outcome, since the advantage documented in [2] emerges at far
+          greater depth.
         </p>
       </div>
 
@@ -601,6 +603,24 @@
           augmentation. Evaluation is single-view on the 10,000 image test
           split.
         </p>
+        <p>
+          The training split deserves to be stated rather than assumed, because
+          holding out 5,000 images or not is worth roughly the size of the
+          effects discussed here. Section 4.2 of [1] describes CIFAR-10 as
+          &ldquo;50k training images and 10k testing images&rdquo; and says
+          &ldquo;we present experiments trained on the training set and
+          evaluated on the test set&rdquo;; the smaller split appears once, and
+          only as the source of a hyperparameter &mdash; training terminates at
+          64k iterations, &ldquo;which is determined on a 45k/5k train/val
+          split&rdquo;. So the paper's Table 6 models are trained on all 50,000
+          images, with 45k/5k used to fix the schedule length beforehand. This
+          work follows the same two-stage arrangement: the 45k/5k split exists
+          in the pipeline and is what the schedule was checked against, and
+          every number reported here comes from a model trained on the full
+          50,000. Neither side trains on fewer images than the other, so the
+          comparison in Section 3 is not carrying a data advantage in either
+          direction.
+        </p>
 
         <h3 class="sub">Protocol</h3>
         <p>
@@ -641,17 +661,29 @@
                 <td>ResNet-20</td>
                 <td class="num">269,722</td>
                 <td class="num">8.75%</td>
-                <td class="num">8.39 &plusmn; 0.31%</td>
-                <td class="num">&minus;0.36</td>
-                <td class="num">8.30 / 8.13 / 8.73</td>
+                <td class="num">
+                  <span data-stat="resnet20.meansd">8.39 ± 0.31%</span>
+                </td>
+                <td class="num">
+                  <span data-stat="resnet20.delta">−0.36</span>
+                </td>
+                <td class="num">
+                  <span data-stat="resnet20.seeds">8.30 / 8.13 / 8.73</span>
+                </td>
               </tr>
               <tr>
                 <td>ResNet-56</td>
                 <td class="num">853,018</td>
                 <td class="num">6.97%</td>
-                <td class="num">7.45 &plusmn; 0.69%</td>
-                <td class="num">+0.48</td>
-                <td class="num">6.91 / 7.21 / 8.22</td>
+                <td class="num">
+                  <span data-stat="resnet56.meansd">7.45 ± 0.69%</span>
+                </td>
+                <td class="num">
+                  <span data-stat="resnet56.delta">+0.48</span>
+                </td>
+                <td class="num">
+                  <span data-stat="resnet56.seeds">6.91 / 7.21 / 8.22</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -688,9 +720,10 @@
           </div>
           <figcaption>
             <b>Figure 1</b> Both models land inside the tolerance band, but not
-            equally comfortably. ResNet-56 clears it by 0.02 percentage points,
-            and the reason is visible: its seed 2 sits far to the right of the
-            other two. The horizontal bar through each mean spans one standard
+            equally comfortably. ResNet-56 clears it by
+            <span data-stat="resnet56.margin">0.02</span> percentage points, and
+            the reason is visible: its seed 2 sits far to the right of the other
+            two. The horizontal bar through each mean spans one standard
             deviation.
           </figcaption>
         </figure>
@@ -698,15 +731,19 @@
         <p>
           Both models meet the criterion. ResNet-20 is comfortably inside,
           landing slightly better than the paper. ResNet-56 passes by a margin
-          of 0.02 percentage points, which is small enough that it deserves
-          stating rather than rounding away.
+          of <span data-stat="resnet56.margin">0.02</span> percentage points,
+          which is small enough that it deserves stating rather than rounding
+          away.
         </p>
         <p>
-          The cause is a single run. Seeds 0 and 1 give 6.91% and 7.21%,
-          straddling the paper's 6.97% closely, and on those alone the match
-          would look tight. Seed 2 gives 8.22%, which is 1.3 points worse than
-          seed 0 and well outside the pair. That one trajectory lifts the mean
-          and doubles the standard deviation. A deeper network being harder to
+          The cause is a single run. Seeds 0 and 1 give
+          <span data-stat="resnet56.seed0">6.91</span>% and
+          <span data-stat="resnet56.seed1">7.21</span>%, straddling the paper's
+          6.97% closely, and on those alone the match would look tight. Seed 2
+          gives <span data-stat="resnet56.seed2">8.22</span>%, which is
+          <span data-stat="resnet56.seed_gap">1.31</span> points worse than seed
+          0 and well outside the pair. That one trajectory lifts the mean and
+          doubles the standard deviation. A deeper network being harder to
           optimise is a plausible reading, and so is ordinary variance, and
           three seeds cannot separate the two.
         </p>
@@ -765,74 +802,48 @@
               <tr>
                 <td><i class="swatch sw-a"></i>Original</td>
                 <td>CIFAR-10</td>
-                <td class="num">7.45 &plusmn; 0.69%</td>
-                <td class="num">6.91 / 7.21 / 8.22</td>
-                <td class="num pass">not measured</td>
+                <td class="num">
+                  <span data-stat="resnet56.meansd">7.45 ± 0.69%</span>
+                </td>
+                <td class="num">
+                  <span data-stat="resnet56.seeds">6.91 / 7.21 / 8.22</span>
+                </td>
+                <td class="num pass">
+                  <span data-stat="resnet56.train">not measured</span>
+                </td>
               </tr>
               <tr>
                 <td><i class="swatch sw-b"></i>Pre-activation</td>
                 <td>CIFAR-10</td>
-                <td class="num">7.22 &plusmn; 0.29%</td>
-                <td class="num">7.08 / 7.03 / 7.55</td>
-                <td class="num">0.02 to 0.03%</td>
+                <td class="num">
+                  <span data-stat="preact56.meansd">7.22 ± 0.29%</span>
+                </td>
+                <td class="num">
+                  <span data-stat="preact56.seeds">7.08 / 7.03 / 7.55</span>
+                </td>
+                <td class="num">
+                  <span data-stat="preact56.train">0.02 to 0.03%</span>
+                </td>
               </tr>
               <tr>
                 <td><i class="swatch sw-a"></i>Original</td>
                 <td>CIFAR-100</td>
-                <td class="num">29.75 &plusmn; 0.42%</td>
-                <td class="num">29.33 / 30.16 / 29.77</td>
-                <td class="num">0.51 to 0.64%</td>
-              </tr>
-              <tr>
-                <td><i class="swatch sw-b"></i>Pre-activation</td>
-                <td>CIFAR-100</td>
-                <td class="num">29.97 &plusmn; 0.37%</td>
-                <td class="num">29.96 / 30.35 / 29.61</td>
-                <td class="num">0.48 to 0.49%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <figure class="breakout">
-          <div class="plot">
-            <div class="legend">
-              <span
-                ><i class="lswatch" style="background: var(--sa)"></i> original
-                block</span
-              >
-              <span
-                ><i class="lswatch" style="background: var(--sb)"></i>
-                pre-activation block</span
-              >
-              <span
-                >filled marker: mean &middot; hollow: individual seed &middot;
-                bar: &plusmn;1 s.d.</span
-              >
-            </div>
-            <svg
-              id="fig2"
-              viewBox="0 0 760 230"
-              width="100%"
-              role="img"
-              aria-label="Per-seed test error for both blocks on CIFAR-10 and CIFAR-100, showing overlapping intervals in both panels."
-            ></svg>
-          </div>
-          <figcaption>
-            <b>Figure 2</b> The two blocks are drawn on separate scales because
-            the datasets differ by a factor of four in error. In both panels the
-            standard deviation bars overlap heavily, and the seed clouds
-            interleave. Note that the ordering reverses between panels.
-          </figcaption>
-        </figure>
-
-        <div class="finding">
-          <p>
-            <b>Finding.</b> At depth 56, the pre-activation block produces no
-            measurable change in test error. On CIFAR-10 it is 0.23 points
-            better, on CIFAR-100 it is 0.22 points worse. The combined standard
-            deviations are 0.74 and 0.56, so each difference is 0.31 and 0.39 of
-            the noise.
+                <td class="num">
+                  <span data-stat="resnet56_c100.meansd">29.75 ± 0.42%</span>
+                </td>
+                <td class="num">
+                  <span data-stat="resnet56_c100.seeds"
+                    >29.33 / 30.16 / 29.77</span>
+                </td>
+                <td class="num">
+                  <span data-stat="preact56_c100.seeds"
+                    >29.96 / 30.35 / 29.61</span> points better, on
+            CIFAR-100 it is <span data-stat="absdelta.cifar100">0.22</span>
+            points worse. The combined standard deviations are
+            <span data-stat="combsd.cifar10">0.74</span> and
+            <span data-stat="combsd.cifar100">0.56</span>, so each difference is
+            <span data-stat="ratio.cifar10">0.30</span> and
+            <span data-stat="ratio.cifar100">0.40</span> of the noise.
           </p>
           <p>
             The sign reversal is the substantive part. A real effect of that
@@ -857,14 +868,17 @@
         <p>
           One asymmetry survives, and it is deliberately reported as an
           observation rather than a result. Pre-activation has the smaller
-          standard deviation in both panels, 0.29 against 0.69 on CIFAR-10 and
-          0.37 against 0.42 on CIFAR-100, and the widest single excursion in the
-          whole matrix is the original block's CIFAR-10 seed 2. Easier
-          optimisation is exactly the story [2] tells, so the direction is
-          suggestive. Comparing dispersions from three samples per cell is weak
-          evidence, and no further seeds were run, because adding seeds until a
-          difference clears a threshold tests the experimenter rather than the
-          network.
+          standard deviation in both panels,
+          <span data-stat="preact56.sd">0.29</span> against
+          <span data-stat="resnet56.sd">0.69</span> on CIFAR-10 and
+          <span data-stat="preact56_c100.sd">0.37</span> against
+          <span data-stat="resnet56_c100.sd">0.42</span> on CIFAR-100, and the
+          widest single excursion in the whole matrix is the original block's
+          CIFAR-10 seed 2. Easier optimisation is exactly the story [2] tells,
+          so the direction is suggestive. Comparing dispersions from three
+          samples per cell is weak evidence, and no further seeds were run,
+          because adding seeds until a difference clears a threshold tests the
+          experimenter rather than the network.
         </p>
       </section>
 
@@ -872,7 +886,9 @@
         <h2 class="sec"><span class="num">5</span> Training behaviour</h2>
         <p>
           The CIFAR-100 cells fit their training data essentially completely.
-          Train error settles between 0.48% and 0.64% across both blocks while
+          Train error settles between
+          <span data-stat="c100.train_lo">0.48</span>% and
+          <span data-stat="c100.train_hi">0.64</span>% across both blocks while
           test error stays near 30%, so what remains is generalisation gap and
           not underfitting. Both blocks reach that same fully fitted state,
           which is consistent with the null: they are not separated by
@@ -919,9 +935,44 @@
         <h2 class="sec"><span class="num">6</span> Limitations</h2>
         <ul class="tight">
           <li>
-            <b>Three seeds.</b> Three is the minimum this work committed to in
-            advance, not a number chosen because it suffices to characterise the
-            tail. ResNet-56's standard deviation of 0.69 shows what that costs.
+            <b>A tolerance without a precision.</b> Three seeds was fixed in
+            advance and so was the &plusmn;0.5 point tolerance, but the two were
+            never checked against each other, and they do not survive the check.
+            ResNet-56's sample standard deviation is
+            <span data-stat="resnet56.sd">0.69</span> points, so the standard
+            error on a three-seed mean is
+            <span data-stat="resnet56.se">0.40</span> points &mdash; almost as
+            large as the entire tolerance the mean was being tested against. The
+            observed &Delta; of <span data-stat="resnet56.delta">+0.48</span>
+            clears the line by only
+            <span data-stat="resnet56.margin">0.02</span> points, which is
+            <span data-stat="resnet56.margin_se">0.06</span> standard errors:
+            rerunning the same three-seed experiment would put the result on the
+            other side of the line close to half the time. The pass is real, but
+            it is a pass at coin-flip resolution, and it should be read as such.
+            A pre-registered tolerance is only meaningful when it is paired with
+            a pre-registered precision &mdash; a seed count chosen so that the
+            standard error is small next to the tolerance &mdash; and this work
+            did not do that. At this spread, a standard error of 0.1 points
+            would have needed about
+            <span data-stat="resnet56.n_for_se01">48</span> seeds, roughly
+            <span data-stat="resnet56.hours_for_se01">100</span> GPU-hours for
+            one cell, which is the real reason the number is three.
+          </li>
+          <li>
+            <b>Logs were not retained.</b> Full evaluation logs survive for
+            exactly one of the <span data-stat="runs.total">15</span> runs, the
+            pre-activation model on CIFAR-100, which is why Figure 3 shows a
+            single configuration rather than four. Every other run reported only
+            its final numbers, and the per-interval train and test error it
+            printed lived in a session that no longer exists. This is a
+            reproducibility gap in the work rather than a presentation choice:
+            it is also why the train error for original ResNet-56 on CIFAR-10 in
+            Table 2 reads &ldquo;not measured&rdquo;, which is exactly the cell
+            containing the seed 2 excursion of Section 3, so the one run whose
+            behaviour is worth explaining is the one with no record of it. The
+            training loop now writes a per-run log at every evaluation interval
+            to a file committed with the repository, so the gap does not repeat.
           </li>
           <li>
             <b>One depth.</b> The 2&times;2 tests one depth. It says nothing
@@ -956,9 +1007,11 @@
           fails in seconds instead of two hours into a GPU run.
         </p>
         <p>
-          Total cost was about 26 GPU-hours of training across 15 runs. Each
-          configuration ran as one job, because a job killed at the session
-          limit loses its output entirely.
+          Total cost was about
+          <span data-stat="runs.gpu_hours">26</span> GPU-hours of training
+          across <span data-stat="runs.total">15</span>
+          runs. Each configuration ran as one job, because a job killed at the
+          session limit loses its output entirely.
         </p>
         <p class="mono" style="margin-top: 1.2rem">
           <a href="https://github.com/AmroAbujabal/resnet-cifar-repro"
@@ -992,8 +1045,10 @@
       </section>
 
       <p class="colophon">
-        Figures rendered from <span class="mono">results.csv</span> in the
-        linked repository. Reproduction target and seed count were fixed before
+        Figures and every statistic on this page are written into it by
+        <span class="mono">scripts/build_site.py</span> from
+        <span class="mono">results.csv</span> and the per-run logs in the linked
+        repository. Reproduction target and seed count were fixed before
         training began.
       </p>
     </div>
@@ -1059,7 +1114,8 @@
           node.addEventListener("mouseleave", hideTip);
         }
 
-        // ---------------------------------------------------------------- data
+        // <<< GENERATED from results.csv + logs/ by scripts/build_site.py.
+        // Do not edit by hand: rerun the script after any new run appends.
         var REPRO = [
           { label: "ResNet-20", paper: 8.75, seeds: [8.3, 8.13, 8.73] },
           { label: "ResNet-56", paper: 6.97, seeds: [6.91, 7.21, 8.22] },
@@ -1072,72 +1128,28 @@
             hi: 8.6,
             step: 0.5,
             rows: [
-              {
-                label: "original",
-                color: "var(--sa)",
-                seeds: [6.91, 7.21, 8.22],
-              },
-              {
-                label: "pre-act",
-                color: "var(--sb)",
-                seeds: [7.08, 7.03, 7.55],
-              },
+              { label: "original", color: "var(--sa)", seeds: [6.91, 7.21, 8.22] },
+              { label: "pre-act", color: "var(--sb)", seeds: [7.08, 7.03, 7.55] },
             ],
           },
           {
-            // Same 2.2 point span as the CIFAR-10 panel, so a bar of equal
-            // width means an equal spread in both panels.
             panel: "CIFAR-100",
             lo: 28.9,
             hi: 31.1,
             step: 0.5,
             rows: [
-              {
-                label: "original",
-                color: "var(--sa)",
-                seeds: [29.33, 30.16, 29.77],
-              },
-              {
-                label: "pre-act",
-                color: "var(--sb)",
-                seeds: [29.96, 30.35, 29.61],
-              },
+              { label: "original", color: "var(--sa)", seeds: [29.33, 30.16, 29.77] },
+              { label: "pre-act", color: "var(--sb)", seeds: [29.96, 30.35, 29.61] },
             ],
           },
         ];
 
         var CURVES = [
-          [
-            [8000, 46.78],
-            [16000, 41.14],
-            [24000, 38.33],
-            [32000, 38.1],
-            [40000, 29.7],
-            [48000, 30.51],
-            [56000, 29.93],
-            [64000, 29.96],
-          ],
-          [
-            [8000, 48.16],
-            [16000, 41.96],
-            [24000, 43.41],
-            [32000, 39.8],
-            [40000, 30.64],
-            [48000, 30.98],
-            [56000, 30.12],
-            [64000, 30.35],
-          ],
-          [
-            [8000, 44.43],
-            [16000, 41.19],
-            [24000, 41.41],
-            [32000, 38.84],
-            [40000, 29.81],
-            [48000, 30.27],
-            [56000, 29.53],
-            [64000, 29.61],
-          ],
+          [[8000, 46.78], [16000, 41.14], [24000, 38.33], [32000, 38.1], [40000, 29.7], [48000, 30.51], [56000, 29.93], [64000, 29.96]],
+          [[8000, 48.16], [16000, 41.96], [24000, 43.41], [32000, 39.8], [40000, 30.64], [48000, 30.98], [56000, 30.12], [64000, 30.35]],
+          [[8000, 44.43], [16000, 41.19], [24000, 41.41], [32000, 38.84], [40000, 29.81], [48000, 30.27], [56000, 29.53], [64000, 29.61]],
         ];
+        // >>> END GENERATED
 
         // ---------------------------------------------------- Figure 1: repro
         function figure1() {

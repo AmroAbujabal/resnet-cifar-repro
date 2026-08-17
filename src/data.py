@@ -5,6 +5,9 @@ Test/val view: original 32x32, untouched.
 Per-pixel mean subtraction, mean computed from the TRAIN split only.
 Downsample/color-aug decisions per PLAN.md: pad+crop+flip only, no color aug.
 """
+import random
+
+import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
@@ -79,13 +82,23 @@ def get_datasets(root: str, val_size: int = 5000, seed: int = 0, download: bool 
     }
 
 
+def _seed_worker(worker_id):
+    """Worker RNG. torch seeds its own generator per worker from the parent seed,
+    which is what the crop and flip draw from; python's and numpy's are left at
+    whatever the fork inherited, so they are seeded here from torch's."""
+    s = torch.initial_seed() % 2**32
+    random.seed(s)
+    np.random.seed(s)
+
+
 def get_loaders(root: str, batch_size: int = 128, val_size: int = 5000, seed: int = 0,
                 download: bool = True, full_train: bool = False, num_workers: int = 0,
                 dataset: str = "cifar10"):
     ds = get_datasets(root, val_size, seed, download, full_train, dataset)
     return {
         "train": DataLoader(ds["train"], batch_size=batch_size, shuffle=True,
-                            num_workers=num_workers, drop_last=True),
+                            num_workers=num_workers, drop_last=True,
+                            worker_init_fn=_seed_worker),
         "train_eval": DataLoader(ds["train_eval"], batch_size=batch_size, shuffle=False,
                                  num_workers=num_workers),
         "val": DataLoader(ds["val"], batch_size=batch_size, shuffle=False,
