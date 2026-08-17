@@ -1,7 +1,7 @@
-"""Regenerate every results-derived number in site/index.html from results.csv.
+"""Regenerate the results-derived numbers in site/index.html from results.csv.
 
-The write-up claims that no number on it was transcribed by hand. This script is
-what makes that true: it recomputes every statistic from `results.csv` (and the
+The write-up claims that no *result* on it was transcribed by hand. This script is
+what makes that true: it recomputes the statistics from `results.csv` (and the
 per-run evaluation logs in `logs/` for Figure 3) and writes them back into
 
   * the `<span data-stat="KEY">` placeholders in the prose and tables, and
@@ -12,8 +12,10 @@ Run it after any run appends to results.csv:
     python scripts/build_site.py            # rewrite the page
     python scripts/build_site.py --check    # fail if the page is out of date
 
-Paper values are constants here, not statistics -- they are quoted from Table 6
-of He et al. 2015 and are the one thing on the page that is not ours to compute.
+Not everything numeric on the page comes from here, and the distinction matters:
+paper values (8.75%, 6.97%) are quoted from Table 6 of He et al. 2015, parameter
+counts are asserted by the test suite, and the figure axis bounds are chosen. What
+this script owns is every number that is a *result of a run*.
 """
 import argparse
 import csv
@@ -46,11 +48,11 @@ def load_runs():
         key = (r["model"], int(r["seed"]))
         # A duplicate (model, seed) means a rerun was appended. Which row the
         # published mean should use is a judgement call, not a default, so stop
-        # rather than silently pick one.
-        assert key not in runs, (
-            f"{RESULTS} has two rows for {key}. A rerun needs an explicit rule "
-            "for which row the reported aggregate uses -- see CLAUDE.md."
-        )
+        # rather than silently pick one. sys.exit, not assert: python -O would
+        # strip an assert and turn a documented refusal into last-row-wins.
+        if key in runs:
+            sys.exit(f"{RESULTS} has two rows for {key}. A rerun needs an explicit rule "
+                     "for which row the reported aggregate uses -- see CLAUDE.md.")
         runs[key] = r
     return rows, runs
 
@@ -62,13 +64,16 @@ def cell(runs, model):
     train = [runs[(model, s)]["train_error_pct"] for s in seeds]
     train = [float(t) for t in train if t != ""]
     wall = [float(runs[(model, s)]["wall_min"]) for s in seeds]
+    # A one-run cell has no spread. resnet56_rerun is exactly that, so this is not
+    # a hypothetical: st.stdev would raise and take the whole page build with it.
+    sd = st.stdev(test) if len(test) > 1 else None
     return {
         "seeds": seeds,
         "test": test,
         "train": train,
         "mean": st.mean(test),
-        "sd": st.stdev(test),
-        "se": st.stdev(test) / math.sqrt(len(test)),
+        "sd": sd,
+        "se": sd / math.sqrt(len(test)) if sd is not None else None,
         "wall_h": st.mean(wall) / 60.0,
     }
 
@@ -80,9 +85,10 @@ def stats(rows, runs):
 
     for m, d in c.items():
         out[f"{m}.mean"] = f"{d['mean']:.2f}"
-        out[f"{m}.sd"] = f"{d['sd']:.2f}"
-        out[f"{m}.se"] = f"{d['se']:.2f}"
-        out[f"{m}.meansd"] = f"{d['mean']:.2f} ± {d['sd']:.2f}%"
+        out[f"{m}.sd"] = "n/a" if d["sd"] is None else f"{d['sd']:.2f}"
+        out[f"{m}.se"] = "n/a" if d["se"] is None else f"{d['se']:.2f}"
+        out[f"{m}.meansd"] = (f"{d['mean']:.2f}%" if d["sd"] is None
+                              else f"{d['mean']:.2f} ± {d['sd']:.2f}%")
         out[f"{m}.seeds"] = " / ".join(f"{v:.2f}" for v in d["test"])
         for i, v in zip(d["seeds"], d["test"]):
             out[f"{m}.seed{i}"] = f"{v:.2f}"
@@ -119,6 +125,9 @@ def stats(rows, runs):
     out["c100.train_hi"] = f"{max(c100):.2f}"
 
     out["runs.total"] = str(len(rows))
+    # The Limitations bullet about retained logs states this as a fraction. Both
+    # halves have to be computed, or the appended row moves one and not the other.
+    out["runs.logged"] = str(len([f for f in os.listdir(LOGS) if "_seed" in f]))
     out["runs.gpu_hours"] = f"{sum(float(r['wall_min']) for r in rows) / 60:.0f}"
     return out, c
 
@@ -134,7 +143,8 @@ def curves():
         with open(os.path.join(LOGS, f"{FIG3}_seed{seed}.csv"), newline="") as f:
             pts = [(int(r["iter"]), float(r["test_error_pct"])) for r in csv.DictReader(f)]
         series.append(pts)
-    assert series, f"no {FIG3} logs in {LOGS}"
+    if not series:
+        sys.exit(f"no {FIG3} logs in {LOGS} -- Figure 3 would render blank")
     return series
 
 
@@ -176,24 +186,54 @@ def js_block(c):
 
 def render(html, values, c):
     unknown = set(re.findall(r'data-stat="([^"]+)"', html)) - set(values)
-    assert not unknown, f"page asks for stats this script does not compute: {sorted(unknown)}"
+    if unknown:
+        sys.exit(f"page asks for stats this script does not compute: {sorted(unknown)}")
 
     for key, value in values.items():
-        pattern = re.compile(r'(<span[^>]*data-stat="%s"[^>]*>)(.*?)(</span>)'
+        # The body is [^<]*, never .*? -- a data-stat span holds plain text, and a
+        # formatter may close it as "</span\n>". With .*? and a literal "</span>",
+        # the non-greedy body runs past such a close to the next literal one and the
+        # substitution eats every tag in between. That silently deleted a table row,
+        # a whole figure and the opening of a paragraph before this was caught.
+        pattern = re.compile(r'(<span[^>]*data-stat="%s"[^>]*>)([^<]*)(</span\s*>)'
                              % re.escape(key), re.S)
-        html = pattern.sub(lambda m: m.group(1) + value + m.group(3), html)
-    return re.sub(r"        // <<< GENERATED.*?// >>> END GENERATED",
+        expected = len(re.findall(r'data-stat="%s"' % re.escape(key), html))
+        html, n = pattern.subn(lambda m: m.group(1) + value + m.group(3), html)
+        if n != expected:
+            sys.exit(f"{key}: substituted {n} of {expected} spans -- the page's markup "
+                     "is not what this script expects; fix it before publishing")
+
+    html = re.sub(r"        // <<< GENERATED.*?// >>> END GENERATED",
                   lambda _: js_block(c), html, flags=re.S)
+    check_structure(html)
+    return html
+
+
+def check_structure(html):
+    """The page must still be a whole page. Cheap, because this script rewrites
+    published markup in place and a value check cannot see a missing figure."""
+    for tag in ("table", "tbody", "tr", "td", "figure", "div", "p", "ul", "li", "span"):
+        opened = len(re.findall(r"<%s[\s>]" % tag, html))
+        closed = len(re.findall(r"</%s\s*>" % tag, html))
+        if opened != closed:
+            sys.exit(f"<{tag}> is unbalanced: {opened} open, {closed} close")
+    for anchor in ('id="fig1"', 'id="fig2"', 'id="fig3"'):
+        if anchor not in html:
+            sys.exit(f"{anchor} is missing -- a figure would render blank and silently")
 
 
 def page_values(html):
     """What the page currently states: displayed statistics, and the numbers in the
     figure block. Compared instead of the raw bytes because the page is run through
     a formatter, and a reflowed line is not a stale number."""
-    spans = {k: re.sub(r"\s+", " ", v).strip() for k, v in
-             re.findall(r'data-stat="([^"]+)"[^>]*>(.*?)</span>', html, re.S)}
+    # A list, not a dict: several keys appear more than once on the page, and a dict
+    # keeps only the last, so a hand-edited number in the abstract would compare equal
+    # to the same key's correct value in a table and --check would report "current".
+    spans = [(k, re.sub(r"\s+", " ", v).strip()) for k, v in
+             re.findall(r'data-stat="([^"]+)"[^>]*>([^<]*)</span\s*>', html, re.S)]
     block = re.search(r"// <<< GENERATED.*?// >>> END GENERATED", html, re.S)
-    assert block, "page has lost its GENERATED markers"
+    if not block:
+        sys.exit("page has lost its GENERATED markers")
     return spans, re.findall(r"-?\d+\.?\d*", block.group(0))
 
 

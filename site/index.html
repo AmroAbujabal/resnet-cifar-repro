@@ -833,11 +833,69 @@
                 </td>
                 <td class="num">
                   <span data-stat="resnet56_c100.seeds"
-                    >29.33 / 30.16 / 29.77</span>
+                    >29.33 / 30.16 / 29.77</span
+                  >
+                </td>
+                <td class="num">
+                  <span data-stat="resnet56_c100.train">0.51 to 0.64%</span>
+                </td>
+              </tr>
+              <tr>
+                <td><i class="swatch sw-b"></i>Pre-activation</td>
+                <td>CIFAR-100</td>
+                <td class="num">
+                  <span data-stat="preact56_c100.meansd">29.97 ± 0.37%</span>
                 </td>
                 <td class="num">
                   <span data-stat="preact56_c100.seeds"
-                    >29.96 / 30.35 / 29.61</span> points better, on
+                    >29.96 / 30.35 / 29.61</span
+                  >
+                </td>
+                <td class="num">
+                  <span data-stat="preact56_c100.train">0.48 to 0.49%</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="breakout">
+          <div class="plot">
+            <div class="legend">
+              <span
+                ><i class="lswatch" style="background: var(--sa)"></i> original
+                block</span
+              >
+              <span
+                ><i class="lswatch" style="background: var(--sb)"></i>
+                pre-activation block</span
+              >
+              <span
+                >filled marker: mean &middot; hollow: individual seed &middot;
+                bar: &plusmn;1 s.d.</span
+              >
+            </div>
+            <svg
+              id="fig2"
+              viewBox="0 0 760 230"
+              width="100%"
+              role="img"
+              aria-label="Per-seed test error for both blocks on CIFAR-10 and CIFAR-100, showing overlapping intervals in both panels."
+            ></svg>
+          </div>
+          <figcaption>
+            <b>Figure 2</b> The two blocks are drawn on separate scales because
+            the datasets differ by a factor of four in error. In both panels the
+            standard deviation bars overlap heavily, and the seed clouds
+            interleave. Note that the ordering reverses between panels.
+          </figcaption>
+        </figure>
+
+        <div class="finding">
+          <p>
+            <b>Finding.</b> At depth 56, the pre-activation block produces no
+            measurable change in test error. On CIFAR-10 it is
+            <span data-stat="absdelta.cifar10">0.23</span> points better, on
             CIFAR-100 it is <span data-stat="absdelta.cifar100">0.22</span>
             points worse. The combined standard deviations are
             <span data-stat="combsd.cifar10">0.74</span> and
@@ -961,11 +1019,11 @@
           </li>
           <li>
             <b>Logs were not retained.</b> Full evaluation logs survive for
-            exactly one of the <span data-stat="runs.total">15</span> runs, the
-            pre-activation model on CIFAR-100, which is why Figure 3 shows a
-            single configuration rather than four. Every other run reported only
-            its final numbers, and the per-interval train and test error it
-            printed lived in a session that no longer exists. This is a
+            <span data-stat="runs.logged">3</span> of the
+            <span data-stat="runs.total">15</span> runs, which is why Figure 3
+            shows a single configuration rather than four. Every other run
+            reported only its final numbers, and the per-interval train and test
+            error it printed lived in a session that no longer exists. This is a
             reproducibility gap in the work rather than a presentation choice:
             it is also why the train error for original ResNet-56 on CIFAR-10 in
             Table 2 reads &ldquo;not measured&rdquo;, which is exactly the cell
@@ -1128,8 +1186,16 @@
             hi: 8.6,
             step: 0.5,
             rows: [
-              { label: "original", color: "var(--sa)", seeds: [6.91, 7.21, 8.22] },
-              { label: "pre-act", color: "var(--sb)", seeds: [7.08, 7.03, 7.55] },
+              {
+                label: "original",
+                color: "var(--sa)",
+                seeds: [6.91, 7.21, 8.22],
+              },
+              {
+                label: "pre-act",
+                color: "var(--sb)",
+                seeds: [7.08, 7.03, 7.55],
+              },
             ],
           },
           {
@@ -1138,16 +1204,51 @@
             hi: 31.1,
             step: 0.5,
             rows: [
-              { label: "original", color: "var(--sa)", seeds: [29.33, 30.16, 29.77] },
-              { label: "pre-act", color: "var(--sb)", seeds: [29.96, 30.35, 29.61] },
+              {
+                label: "original",
+                color: "var(--sa)",
+                seeds: [29.33, 30.16, 29.77],
+              },
+              {
+                label: "pre-act",
+                color: "var(--sb)",
+                seeds: [29.96, 30.35, 29.61],
+              },
             ],
           },
         ];
 
         var CURVES = [
-          [[8000, 46.78], [16000, 41.14], [24000, 38.33], [32000, 38.1], [40000, 29.7], [48000, 30.51], [56000, 29.93], [64000, 29.96]],
-          [[8000, 48.16], [16000, 41.96], [24000, 43.41], [32000, 39.8], [40000, 30.64], [48000, 30.98], [56000, 30.12], [64000, 30.35]],
-          [[8000, 44.43], [16000, 41.19], [24000, 41.41], [32000, 38.84], [40000, 29.81], [48000, 30.27], [56000, 29.53], [64000, 29.61]],
+          [
+            [8000, 46.78],
+            [16000, 41.14],
+            [24000, 38.33],
+            [32000, 38.1],
+            [40000, 29.7],
+            [48000, 30.51],
+            [56000, 29.93],
+            [64000, 29.96],
+          ],
+          [
+            [8000, 48.16],
+            [16000, 41.96],
+            [24000, 43.41],
+            [32000, 39.8],
+            [40000, 30.64],
+            [48000, 30.98],
+            [56000, 30.12],
+            [64000, 30.35],
+          ],
+          [
+            [8000, 44.43],
+            [16000, 41.19],
+            [24000, 41.41],
+            [32000, 38.84],
+            [40000, 29.81],
+            [48000, 30.27],
+            [56000, 29.53],
+            [64000, 29.61],
+          ],
         ];
         // >>> END GENERATED
 

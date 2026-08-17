@@ -135,9 +135,11 @@ so a future transform that reaches for either cannot silently break it.
   original × CIFAR-10 train error reads "not measured" — the one cell whose behaviour is worth
   explaining. `logs/preact56_c100_seed{0,1,2}.csv` are recovered from the Kaggle version-4 output
   and have an empty train column: those evaluations only measured test error.
-- Train error is now measured at **every** eval interval, not once at the end. It costs one
-  50k-image forward pass per interval (~8 per run, ≈2% of wall time) and it replaces the duplicate
-  end-of-run evaluation the loop used to do, so a run is no slower than before.
+- Train error is now measured at **every** eval interval, not once at the end. Net cost is
+  **+340k forward-pass images per run** (8×50k train evals in, one end-of-run 50k train eval and
+  one duplicate 10k test eval out), ≈**2% of wall time**. It is not free — an earlier version of
+  this line claimed it was, on the grounds that it replaced the end-of-run evaluation, which only
+  accounts for one of the eight.
 - `scripts/build_site.py` writes every results-derived number into `site/index.html`: the
   `data-stat="KEY"` spans in prose and tables, and the figure data block between the `GENERATED`
   markers. **Never hand-edit a number in the page or inside those markers.** Run the script after
@@ -156,6 +158,14 @@ so a future transform that reaches for either cannot silently break it.
 `resnet56_rerun` = `resnet56` with a different name, seed 2 only, under the deterministic setup
 with per-interval logging. It exists because the seed 2 excursion (8.22%, 1.31 points above seed 0) has no train-error curve behind it, so "deeper nets are harder to optimise" and "generalisation
 wobble" are indistinguishable in the published write-up. What the outcome means:
+
+**Getting the rerun onto the page:** no new code is needed. `stats()` generates a key per model
+automatically, so the row lands as `resnet56_rerun.mean` / `.seeds` / `.train` the moment it is in
+`results.csv`. Table 2's original × CIFAR-10 train-error cell should become a
+`data-stat="resnet56_rerun.train"` span **with a visible label saying it comes from the rerun** —
+that cell sits in a row whose test error is the three-seed mean, and an unlabelled number there
+would imply the original three runs measured a train error they never measured. Do not hand-type
+it; that is the invariant this whole pass exists to protect.
 
 - **~8.2% with elevated train error** → optimisation failure, supports the Section 3 reading.
 - **~8.2% with normal train error** → generalisation wobble; the seed 2 paragraph gets rewritten.

@@ -40,6 +40,8 @@ def main():
     ap.add_argument("--data-root", default="data")
     ap.add_argument("--results", default="results.csv")
     ap.add_argument("--log-dir", default="logs", help="per-run evaluation logs (committed)")
+    ap.add_argument("--overwrite-log", action="store_true",
+                    help="replace an existing per-run log instead of refusing")
     ap.add_argument("--eval-every", type=int, default=8000)
     args = ap.parse_args()
 
@@ -71,6 +73,11 @@ def main():
 
     os.makedirs(args.log_dir, exist_ok=True)
     log_path = os.path.join(args.log_dir, f"{cfg['name']}_seed{args.seed}.csv")
+    # These logs are committed and some are irrecoverable, so opening "w" would
+    # destroy one the instant a name+seed is re-run -- including at iteration 0 of a
+    # run that then dies at the session limit, which is the case the log exists for.
+    if os.path.exists(log_path) and not args.overwrite_log:
+        sys.exit(f"{log_path} exists; pass --overwrite-log to replace that run's curve")
     log = open(log_path, "w", newline="")
     log_w = csv.writer(log)
     log_w.writerow(["iter", "train_error_pct", "test_error_pct"])
