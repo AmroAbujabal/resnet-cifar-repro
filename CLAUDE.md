@@ -137,9 +137,12 @@ so a future transform that reaches for either cannot silently break it.
   and have an empty train column: those evaluations only measured test error.
 - Train error is now measured at **every** eval interval, not once at the end. Net cost is
   **+340k forward-pass images per run** (8×50k train evals in, one end-of-run 50k train eval and
-  one duplicate 10k test eval out), ≈**2% of wall time**. It is not free — an earlier version of
-  this line claimed it was, on the grounds that it replaced the end-of-run evaluation, which only
-  accounts for one of the eight.
+  one duplicate 10k test eval out). **Measured, it is below the noise floor:** `resnet56_rerun`
+  did all eight train evals *and* carried the determinism flags and still finished in 123.7 min,
+  against 124.2–129.3 min for the three original `resnet56` runs that did one. The estimate of
+  ≈2% stands as an upper bound; the seed-to-seed spread on Kaggle's hardware is larger. (An
+  earlier version of this line claimed the extra evals were free because they "replaced" the
+  end-of-run one — that accounted for one of the eight, and was wrong for the right reason.)
 - `scripts/build_site.py` writes every results-derived number into `site/index.html`: the
   `data-stat="KEY"` spans in prose and tables, and the figure data block between the `GENERATED`
   markers. **Never hand-edit a number in the page or inside those markers.** Run the script after
