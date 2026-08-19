@@ -153,11 +153,12 @@ so a future transform that reaches for either cannot silently break it.
   and s.d., and the 2×2 keep meaning what they meant. The rerun supplies the train-error column
   and the Section 3 discussion only.
 
-## Phase 4 (launched 2026-08-16)
+## Phase 4 (COMPLETE 2026-08-17) — the rerun did not reproduce 8.22%
 
 `resnet56_rerun` = `resnet56` with a different name, seed 2 only, under the deterministic setup
-with per-interval logging. It exists because the seed 2 excursion (8.22%, 1.31 points above seed 0) has no train-error curve behind it, so "deeper nets are harder to optimise" and "generalisation
-wobble" are indistinguishable in the published write-up. What the outcome means:
+with per-interval logging. It existed because the seed 2 excursion (8.22%, 1.31 points above
+seed 0) had no train-error curve behind it, leaving "deeper nets are harder to optimise" and
+"generalisation wobble" indistinguishable in the published write-up.
 
 **Getting the rerun onto the page:** no new code is needed. `stats()` generates a key per model
 automatically, so the row lands as `resnet56_rerun.mean` / `.seeds` / `.train` the moment it is in
@@ -167,10 +168,21 @@ that cell sits in a row whose test error is the three-seed mean, and an unlabell
 would imply the original three runs measured a train error they never measured. Do not hand-type
 it; that is the invariant this whole pass exists to protect.
 
-- **~8.2% with elevated train error** → optimisation failure, supports the Section 3 reading.
-- **~8.2% with normal train error** → generalisation wobble; the seed 2 paragraph gets rewritten.
-- **Not ~8.2% at all** → a finding about the original runs' reproducibility. Report it; do not
-  quietly replace the old number. This is the _expected_ outcome — see the determinism section.
+**Result (Kaggle version 5, 123.7 min): `resnet56_rerun` seed 2 = 7.57% test, 0.03% train.**
+The third branch happened, and it carries information about the second:
+
+- **It did not reproduce 8.22%** — it landed 0.65 points away. Under the original setup a seed
+  label did not identify a run (autotuned cuDNN kernels), so "seed 2" names a distribution and
+  8.22% is a draw from it. Reported as a finding, not swapped in. **Table 1 still stands on the
+  original three runs**; `resnet56.meansd` is still 7.45 ± 0.69%.
+- **Train error 0.03%** — fully fitted, the same state as every other cell that measured it. A net
+  that reaches zero train error did not fail to optimise, so the "deeper nets are harder to
+  optimise" reading has no support. It does not diagnose the *original* 8.22% run, whose train
+  error was never measured and now never can be. Section 3 and the "On spread" paragraph in
+  Section 4 both say so.
+- Table 2's original × CIFAR-10 train cell reads `0.03% (rerun)` via
+  `data-stat="resnet56_rerun.train"`, with the caption explaining it comes from one rerun and does
+  not enter that row's test error.
 
 ## Kaggle rules (cost real GPU hours when broken)
 

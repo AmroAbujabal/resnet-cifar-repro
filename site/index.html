@@ -743,9 +743,41 @@
           gives <span data-stat="resnet56.seed2">8.22</span>%, which is
           <span data-stat="resnet56.seed_gap">1.31</span> points worse than seed
           0 and well outside the pair. That one trajectory lifts the mean and
-          doubles the standard deviation. A deeper network being harder to
-          optimise is a plausible reading, and so is ordinary variance, and
-          three seeds cannot separate the two.
+          doubles the standard deviation.
+        </p>
+        <p>
+          It was also the one run worth explaining and the one run with no
+          record of it, so it was run again: same configuration, same seed
+          label, under the deterministic setup and the per-interval logging of
+          Section 2. It came back at
+          <span data-stat="resnet56_rerun.seed2">7.57</span>%, which is
+          <span data-stat="resnet56.rerun_gap">0.65</span> points away from the
+          result it is nominally a rerun of, with a final train error of
+          <span data-stat="resnet56_rerun.train">0.03%</span>.
+        </p>
+        <p>
+          The first thing that follows is uncomfortable. Under the original
+          setup a seed label did not identify a run. Those numbers were produced
+          with the cuDNN autotuner free to choose a different convolution
+          algorithm per launch, so &ldquo;seed 2&rdquo; names a distribution and
+          <span data-stat="resnet56.seed2">8.22</span>% is a draw from it that
+          cannot be recovered on demand. The rerun is a fresh draw and not a
+          replay, which is why it is reported beside the reproduction rather
+          than inside it: Table 1 still stands on the original three runs, and a
+          fourth measurement is not a fourth seed.
+        </p>
+        <p>
+          The second is that the excursion is unlikely to be an optimisation
+          failure. The rerun fits its training set essentially completely &mdash;
+          <span data-stat="resnet56_rerun.train">0.03%</span> train error
+          against <span data-stat="resnet56_rerun.seed2">7.57</span>% test
+          &mdash; which is the same fully fitted state as every cell in this work
+          that measured train error at all. A network that reaches zero training
+          error did not fail to optimise. This does not diagnose the original
+          8.22% run, whose train error was never measured and now never can be,
+          but the reading that depth 56 is where optimisation starts to hurt
+          finds no support here, and what is left is a generalisation gap that
+          happened to be wide on one trajectory.
         </p>
         <p>
           The honest summary is that the reproduction succeeds on the stated
@@ -785,7 +817,10 @@
         <p class="tcap">
           <b>Table 2</b> The 2&times;2. Three seeds per cell, twelve runs total.
           CIFAR-100 has no baseline in [1], so those two rows are an internal
-          comparison and not a reproduction claim.
+          comparison and not a reproduction claim. The original CIFAR-10 train
+          error is marked <i>rerun</i> because none of that row&rsquo;s three runs
+          measured it; it comes from the single rerun described in Section 3 and
+          does not enter that row&rsquo;s test error.
         </p>
         <div class="tablewrap">
           <table>
@@ -809,7 +844,7 @@
                   <span data-stat="resnet56.seeds">6.91 / 7.21 / 8.22</span>
                 </td>
                 <td class="num pass">
-                  <span data-stat="resnet56.train">not measured</span>
+                  <span data-stat="resnet56_rerun.train">0.03%</span> (rerun)
                 </td>
               </tr>
               <tr>
@@ -932,8 +967,9 @@
           <span data-stat="preact56_c100.sd">0.37</span> against
           <span data-stat="resnet56_c100.sd">0.42</span> on CIFAR-100, and the
           widest single excursion in the whole matrix is the original block's
-          CIFAR-10 seed 2. Easier optimisation is exactly the story [2] tells,
-          so the direction is suggestive. Comparing dispersions from three
+          CIFAR-10 seed 2 &mdash; though the rerun of that seed in Section 3 fits
+          its training set completely, so if the spread has a cause it is not a
+          failure to optimise. Comparing dispersions from three
           samples per cell is weak evidence, and no further seeds were run,
           because adding seeds until a difference clears a threshold tests the
           experimenter rather than the network.
@@ -975,8 +1011,9 @@
             steps. The first learning rate step at 32,000 iterations produces
             almost all of the final gain, moving all three seeds from roughly
             39% to roughly 30% within one evaluation interval. The second step
-            at 48,000 changes little. Curves are shown for the one configuration
-            whose full evaluation log was retained.
+            at 48,000 changes little. Curves are shown for the only configuration
+            whose full evaluation log survived the original runs; the Section 3
+            rerun is the only other run with one.
           </figcaption>
         </figure>
 
@@ -1019,8 +1056,8 @@
           </li>
           <li>
             <b>Logs were not retained.</b> Full evaluation logs survive for
-            <span data-stat="runs.logged">3</span> of the
-            <span data-stat="runs.total">15</span> runs, which is why Figure 3
+            <span data-stat="runs.logged">4</span> of the
+            <span data-stat="runs.total">16</span> runs, which is why Figure 3
             shows a single configuration rather than four. Every other run
             reported only its final numbers, and the per-interval train and test
             error it printed lived in a session that no longer exists. This is a
@@ -1066,8 +1103,8 @@
         </p>
         <p>
           Total cost was about
-          <span data-stat="runs.gpu_hours">26</span> GPU-hours of training
-          across <span data-stat="runs.total">15</span>
+          <span data-stat="runs.gpu_hours">28</span> GPU-hours of training
+          across <span data-stat="runs.total">16</span>
           runs. Each configuration ran as one job, because a job killed at the
           session limit loses its output entirely.
         </p>
@@ -1186,16 +1223,8 @@
             hi: 8.6,
             step: 0.5,
             rows: [
-              {
-                label: "original",
-                color: "var(--sa)",
-                seeds: [6.91, 7.21, 8.22],
-              },
-              {
-                label: "pre-act",
-                color: "var(--sb)",
-                seeds: [7.08, 7.03, 7.55],
-              },
+              { label: "original", color: "var(--sa)", seeds: [6.91, 7.21, 8.22] },
+              { label: "pre-act", color: "var(--sb)", seeds: [7.08, 7.03, 7.55] },
             ],
           },
           {
@@ -1204,51 +1233,16 @@
             hi: 31.1,
             step: 0.5,
             rows: [
-              {
-                label: "original",
-                color: "var(--sa)",
-                seeds: [29.33, 30.16, 29.77],
-              },
-              {
-                label: "pre-act",
-                color: "var(--sb)",
-                seeds: [29.96, 30.35, 29.61],
-              },
+              { label: "original", color: "var(--sa)", seeds: [29.33, 30.16, 29.77] },
+              { label: "pre-act", color: "var(--sb)", seeds: [29.96, 30.35, 29.61] },
             ],
           },
         ];
 
         var CURVES = [
-          [
-            [8000, 46.78],
-            [16000, 41.14],
-            [24000, 38.33],
-            [32000, 38.1],
-            [40000, 29.7],
-            [48000, 30.51],
-            [56000, 29.93],
-            [64000, 29.96],
-          ],
-          [
-            [8000, 48.16],
-            [16000, 41.96],
-            [24000, 43.41],
-            [32000, 39.8],
-            [40000, 30.64],
-            [48000, 30.98],
-            [56000, 30.12],
-            [64000, 30.35],
-          ],
-          [
-            [8000, 44.43],
-            [16000, 41.19],
-            [24000, 41.41],
-            [32000, 38.84],
-            [40000, 29.81],
-            [48000, 30.27],
-            [56000, 29.53],
-            [64000, 29.61],
-          ],
+          [[8000, 46.78], [16000, 41.14], [24000, 38.33], [32000, 38.1], [40000, 29.7], [48000, 30.51], [56000, 29.93], [64000, 29.96]],
+          [[8000, 48.16], [16000, 41.96], [24000, 43.41], [32000, 39.8], [40000, 30.64], [48000, 30.98], [56000, 30.12], [64000, 30.35]],
+          [[8000, 44.43], [16000, 41.19], [24000, 41.41], [32000, 38.84], [40000, 29.81], [48000, 30.27], [56000, 29.53], [64000, 29.61]],
         ];
         // >>> END GENERATED
 

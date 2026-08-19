@@ -96,10 +96,12 @@ def stats(rows, runs):
         for i, v in zip(d["seeds"], d["test"]):
             out[f"{m}.seed{i}"] = f"{v:.2f}"
         # Empty train error is "never measured", not zero -- say so.
-        out[f"{m}.train"] = (
-            "not measured" if not d["train"]
-            else f"{min(d['train']):.2f} to {max(d['train']):.2f}%"
-        )
+        if not d["train"]:
+            out[f"{m}.train"] = "not measured"
+        elif min(d["train"]) == max(d["train"]):
+            out[f"{m}.train"] = f"{d['train'][0]:.2f}%"
+        else:
+            out[f"{m}.train"] = f"{min(d['train']):.2f} to {max(d['train']):.2f}%"
         if m in PAPER:
             out[f"{m}.delta"] = signed(d["mean"] - PAPER[m])
 
@@ -113,6 +115,13 @@ def stats(rows, runs):
     n = math.ceil((r56["sd"] / 0.1) ** 2)
     out["resnet56.n_for_se01"] = str(n)
     out["resnet56.hours_for_se01"] = f"{round(n * r56['wall_h'] / 10) * 10:.0f}"
+
+    # Phase 4: the same seed label, rerun deterministically. The gap between the two
+    # is the whole finding, so it is computed rather than written into the prose.
+    if "resnet56_rerun" in c:
+        seed = c["resnet56_rerun"]["seeds"][0]
+        original = c["resnet56"]["test"][c["resnet56"]["seeds"].index(seed)]
+        out["resnet56.rerun_gap"] = f"{abs(original - c['resnet56_rerun']['test'][0]):.2f}"
 
     for tag, orig, pre in (("cifar10", "resnet56", "preact56"),
                            ("cifar100", "resnet56_c100", "preact56_c100")):
