@@ -531,8 +531,9 @@
           <span class="mono" data-stat="resnet20.meansd">8.39 ± 0.31%</span> and
           <span class="mono" data-stat="resnet56.meansd">7.45 ± 0.69%</span>
           test error over three seeds against the paper's
-          <span class="mono">8.75%</span> and <span class="mono">6.97%</span>,
-          both inside a pre-registered &plusmn;0.5% tolerance. We then run a
+          <span class="mono" data-stat="paper.resnet20">8.75</span>% and
+          <span class="mono" data-stat="paper.resnet56">6.97</span>%,
+          both inside a pre-registered &plusmn;<span data-stat="tolerance">0.5</span>% tolerance. We then run a
           controlled 2&times;2 comparing the original residual block against the
           full pre-activation block of He et al. [2] across CIFAR-10 and
           CIFAR-100, holding seeds, schedule, augmentation and parameter count
@@ -632,7 +633,8 @@
         </p>
         <p>
           The definition of done for the reproduction was set in advance: the
-          mean over at least three seeds must fall within 0.5 percentage points
+          mean over at least three seeds must fall within
+          <span data-stat="tolerance">0.5</span> percentage points
           of the paper's error.
         </p>
       </section>
@@ -660,7 +662,7 @@
               <tr>
                 <td>ResNet-20</td>
                 <td class="num">269,722</td>
-                <td class="num">8.75%</td>
+                <td class="num"><span data-stat="paper.resnet20">8.75</span>%</td>
                 <td class="num">
                   <span data-stat="resnet20.meansd">8.39 ± 0.31%</span>
                 </td>
@@ -674,7 +676,7 @@
               <tr>
                 <td>ResNet-56</td>
                 <td class="num">853,018</td>
-                <td class="num">6.97%</td>
+                <td class="num"><span data-stat="paper.resnet56">6.97</span>%</td>
                 <td class="num">
                   <span data-stat="resnet56.meansd">7.45 ± 0.69%</span>
                 </td>
@@ -708,7 +710,7 @@
                 individual seed</span
               >
               <span><i class="lline"></i> paper</span>
-              <span><i class="lband"></i> &plusmn;0.5% tolerance</span>
+              <span><i class="lband"></i> &plusmn;<span data-stat="tolerance">0.5</span>% tolerance</span>
             </div>
             <svg
               id="fig1"
@@ -739,7 +741,8 @@
           The cause is a single run. Seeds 0 and 1 give
           <span data-stat="resnet56.seed0">6.91</span>% and
           <span data-stat="resnet56.seed1">7.21</span>%, straddling the paper's
-          6.97% closely, and on those alone the match would look tight. Seed 2
+          <span data-stat="paper.resnet56">6.97</span>% closely, and on those alone the
+          match would look tight. Seed 2
           gives <span data-stat="resnet56.seed2">8.22</span>%, which is
           <span data-stat="resnet56.seed_gap">1.31</span> points worse than seed
           0 and well outside the pair. That one trajectory lifts the mean and
@@ -1031,7 +1034,8 @@
         <ul class="tight">
           <li>
             <b>A tolerance without a precision.</b> Three seeds was fixed in
-            advance and so was the &plusmn;0.5 point tolerance, but the two were
+            advance and so was the &plusmn;<span data-stat="tolerance">0.5</span> point
+            tolerance, but the two were
             never checked against each other, and they do not survive the check.
             ResNet-56's sample standard deviation is
             <span data-stat="resnet56.sd">0.69</span> points, so the standard

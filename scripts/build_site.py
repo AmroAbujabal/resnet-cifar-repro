@@ -136,6 +136,12 @@ def stats(rows, runs):
     out["c100.train_lo"] = f"{min(c100):.2f}"
     out["c100.train_hi"] = f"{max(c100):.2f}"
 
+    # The page prints these next to numbers derived from them, so they are served
+    # from the same constants rather than typed twice.
+    for m, v in PAPER.items():
+        out[f"paper.{m}"] = f"{v:.2f}"
+    out["tolerance"] = f"{TOLERANCE:.1f}"
+
     out["runs.total"] = str(len(rows))
     # The Limitations bullet about retained logs states this as a fraction. Both
     # halves have to be computed, or the appended row moves one and not the other.
@@ -147,12 +153,8 @@ def stats(rows, runs):
 def curves():
     """Figure 3: test error against iteration, per seed, from the retained logs."""
     series = []
-    for seed in sorted(
-        int(f.split("seed")[1].split(".")[0])
-        for f in os.listdir(LOGS)
-        if f.startswith(FIG3 + "_seed")
-    ):
-        with open(os.path.join(LOGS, f"{FIG3}_seed{seed}.csv"), newline="") as f:
+    for name in sorted(f for f in os.listdir(LOGS) if f.startswith(FIG3 + "_seed")):
+        with open(os.path.join(LOGS, name), newline="") as f:
             pts = [(int(r["iter"]), float(r["test_error_pct"])) for r in csv.DictReader(f)]
         series.append(pts)
     if not series:
@@ -196,7 +198,19 @@ def js_block(c):
     return "\n".join(lines).replace("'", '"')
 
 
+def skeleton(html):
+    """The page minus the two regions this script owns: span bodies and the figure
+    block. Everything else has to come through a build byte-identical, and that --
+    not counting tags -- is the invariant. It catches a deleted row, a deleted
+    figure, eaten prose, a mangled attribute: anything outside what we meant to
+    touch. It fails safe, because under-stripping raises a false alarm rather than
+    passing silently."""
+    html = re.sub(r'(data-stat="[^"]+"[^>]*>)[^<]*', r"\1", html)
+    return re.sub(r"// <<< GENERATED.*?// >>> END GENERATED", "", html, flags=re.S)
+
+
 def render(html, values, c):
+    original = html
     present = Counter(re.findall(r'data-stat="([^"]+)"', html))
     unknown = set(present) - set(values)
     if unknown:
@@ -217,13 +231,19 @@ def render(html, values, c):
 
     html = re.sub(r"        // <<< GENERATED.*?// >>> END GENERATED",
                   lambda _: js_block(c), html, flags=re.S)
+    if skeleton(original) != skeleton(html):
+        sys.exit("this build changed the page outside the spans and the figure block. "
+                 "That is how a table row and a whole figure were once deleted; "
+                 "nothing is written.")
     check_structure(html)
     return html
 
 
 def check_structure(html):
-    """The page must still be a whole page. Cheap, because this script rewrites
-    published markup in place and a value check cannot see a missing figure."""
+    """A standing audit of the page as it stands, which skeleton() cannot give:
+    skeleton() compares a build against its own input, so it is blind to damage that
+    arrived by some other route and was committed. This is the only thing that looks
+    at the page on its own terms."""
     for tag in ("table", "tbody", "tr", "td", "figure", "div", "p", "ul", "li", "span"):
         opened = len(re.findall(r"<%s[\s>]" % tag, html))
         closed = len(re.findall(r"</%s\s*>" % tag, html))
