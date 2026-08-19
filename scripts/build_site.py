@@ -24,6 +24,7 @@ import os
 import re
 import statistics as st
 import sys
+from collections import Counter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS = os.path.join(ROOT, "results.csv")
@@ -85,10 +86,12 @@ def stats(rows, runs):
 
     for m, d in c.items():
         out[f"{m}.mean"] = f"{d['mean']:.2f}"
-        out[f"{m}.sd"] = "n/a" if d["sd"] is None else f"{d['sd']:.2f}"
-        out[f"{m}.se"] = "n/a" if d["se"] is None else f"{d['se']:.2f}"
-        out[f"{m}.meansd"] = (f"{d['mean']:.2f}%" if d["sd"] is None
-                              else f"{d['mean']:.2f} ± {d['sd']:.2f}%")
+        if d["sd"] is None:  # a one-run cell has no spread; publish no spread keys
+            out[f"{m}.meansd"] = f"{d['mean']:.2f}%"
+        else:
+            out[f"{m}.sd"] = f"{d['sd']:.2f}"
+            out[f"{m}.se"] = f"{d['se']:.2f}"
+            out[f"{m}.meansd"] = f"{d['mean']:.2f} ± {d['sd']:.2f}%"
         out[f"{m}.seeds"] = " / ".join(f"{v:.2f}" for v in d["test"])
         for i, v in zip(d["seeds"], d["test"]):
             out[f"{m}.seed{i}"] = f"{v:.2f}"
@@ -185,11 +188,12 @@ def js_block(c):
 
 
 def render(html, values, c):
-    unknown = set(re.findall(r'data-stat="([^"]+)"', html)) - set(values)
+    present = Counter(re.findall(r'data-stat="([^"]+)"', html))
+    unknown = set(present) - set(values)
     if unknown:
         sys.exit(f"page asks for stats this script does not compute: {sorted(unknown)}")
 
-    for key, value in values.items():
+    for key, expected in present.items():
         # The body is [^<]*, never .*? -- a data-stat span holds plain text, and a
         # formatter may close it as "</span\n>". With .*? and a literal "</span>",
         # the non-greedy body runs past such a close to the next literal one and the
@@ -197,8 +201,7 @@ def render(html, values, c):
         # a whole figure and the opening of a paragraph before this was caught.
         pattern = re.compile(r'(<span[^>]*data-stat="%s"[^>]*>)([^<]*)(</span\s*>)'
                              % re.escape(key), re.S)
-        expected = len(re.findall(r'data-stat="%s"' % re.escape(key), html))
-        html, n = pattern.subn(lambda m: m.group(1) + value + m.group(3), html)
+        html, n = pattern.subn(lambda m: m.group(1) + values[key] + m.group(3), html)
         if n != expected:
             sys.exit(f"{key}: substituted {n} of {expected} spans -- the page's markup "
                      "is not what this script expects; fix it before publishing")

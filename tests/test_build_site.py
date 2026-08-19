@@ -4,16 +4,13 @@ Both were written as refusals -- a duplicate (model, seed) and a data-stat key t
 script cannot compute -- and neither was exercised by anything, which is a poor
 state for the only thing standing between results.csv and a published number.
 """
-import importlib.util
 import os
 
 import pytest
 
+import build_site as bs  # scripts/ is on sys.path via conftest.py
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_spec = importlib.util.spec_from_file_location(
-    "build_site", os.path.join(ROOT, "scripts", "build_site.py"))
-bs = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(bs)
 
 
 def test_duplicate_model_seed_stops_the_build(tmp_path, monkeypatch):
