@@ -33,7 +33,8 @@ PAGE = os.path.join(ROOT, "site", "index.html")
 
 PAPER = {"resnet20": 8.75, "resnet56": 6.97}  # He et al. 2015, Table 6
 TOLERANCE = 0.5  # pre-registered, fixed before training
-FIG3 = "preact56_c100"  # the one configuration whose eval log survives
+FIG3 = "preact56_c100"  # the one Phase 3 configuration whose eval log survives
+FIG4 = "resnet56_rerun_seed2"  # the only run with a train curve as well as a test one
 MINUS = "−"  # typographic minus, matches the page's &minus;
 
 
@@ -142,6 +143,13 @@ def stats(rows, runs):
         out[f"paper.{m}"] = f"{v:.2f}"
     out["tolerance"] = f"{TOLERANCE:.1f}"
 
+    # The Section 5 sentence about the first decay quotes four points off the
+    # rerun's curve. They come from the log, not from reading the figure.
+    curve = {i: (tr, te) for i, tr, te in rerun_curve()}
+    for it in (32000, 40000):
+        out[f"rerun.train_at_{it // 1000}k"] = f"{curve[it][0]:.2f}"
+        out[f"rerun.test_at_{it // 1000}k"] = f"{curve[it][1]:.2f}"
+
     out["runs.total"] = str(len(rows))
     # The Limitations bullet about retained logs states this as a fraction. Both
     # halves have to be computed, or the appended row moves one and not the other.
@@ -160,6 +168,16 @@ def curves():
     if not series:
         sys.exit(f"no {FIG3} logs in {LOGS} -- Figure 3 would render blank")
     return series
+
+
+def rerun_curve():
+    """Figure 4: train and test error against iteration, from the Phase 4 rerun."""
+    path = os.path.join(LOGS, FIG4 + ".csv")
+    if not os.path.exists(path):
+        sys.exit(f"{path} is missing -- Figure 4 would render blank")
+    with open(path, newline="") as f:
+        return [(int(r["iter"]), float(r["train_error_pct"]), float(r["test_error_pct"]))
+                for r in csv.DictReader(f)]
 
 
 def js_block(c):
@@ -194,6 +212,9 @@ def js_block(c):
     for pts in curves():
         lines.append("          [%s]," % ", ".join(f"[{i}, {e}]" for i, e in pts))
     lines.append("        ];")
+    lines.append("")
+    lines.append("        var RERUN = [%s];" % ", ".join(
+        f"[{i}, {tr}, {te}]" for i, tr, te in rerun_curve()))
     lines.append("        // >>> END GENERATED")
     return "\n".join(lines).replace("'", '"')
 
@@ -249,7 +270,7 @@ def check_structure(html):
         closed = len(re.findall(r"</%s\s*>" % tag, html))
         if opened != closed:
             sys.exit(f"<{tag}> is unbalanced: {opened} open, {closed} close")
-    for anchor in ('id="fig1"', 'id="fig2"', 'id="fig3"'):
+    for anchor in ('id="fig1"', 'id="fig2"', 'id="fig3"', 'id="fig4"'):
         if anchor not in html:
             sys.exit(f"{anchor} is missing -- a figure would render blank and silently")
 

@@ -324,6 +324,13 @@
         height: 9px;
         display: inline-block;
       }
+      .ldash {
+        display: inline-block;
+        width: 16px;
+        height: 0;
+        border-top: 2px dashed var(--sa);
+        vertical-align: middle;
+      }
       .lline {
         width: 14px;
         height: 0;
@@ -1027,6 +1034,49 @@
           nothing here, which suggests the schedule could be shortened without
           much cost, though that was not tested.
         </p>
+        <p>
+          The rerun of Section 3 is the only run in this work with a train curve
+          as well as a test one, and it separates the two effects the schedule
+          produces. Both errors fall at the first decay, but not by the same
+          kind of amount: test error moves from
+          <span data-stat="rerun.test_at_32k">12.90</span>% to
+          <span data-stat="rerun.test_at_40k">7.80</span>% and then flattens,
+          while train error goes from
+          <span data-stat="rerun.train_at_32k">7.17</span>% to
+          <span data-stat="rerun.train_at_40k">0.29</span>% and keeps going to
+          <span data-stat="resnet56_rerun.train">0.03%</span>. After the first
+          decay the network is finished learning the training set and everything
+          remaining is generalisation gap, which is the same state the CIFAR-100
+          cells reach and the reason the seed 2 excursion is not read here as a
+          failure to optimise.
+        </p>
+
+        <figure class="breakout">
+          <div class="plot">
+            <div class="legend">
+              <span
+                ><i class="lswatch" style="background: var(--sa)"></i> test
+                error</span
+              >
+              <span><i class="ldash"></i> train error</span>
+              <span><i class="lline"></i> learning rate step</span>
+            </div>
+            <svg
+              id="fig4"
+              viewBox="0 0 760 260"
+              width="100%"
+              role="img"
+              aria-label="Train and test error against training iteration for the rerun of seed 2, showing train error collapsing to near zero after the first learning rate step while test error plateaus."
+            ></svg>
+          </div>
+          <figcaption>
+            <b>Figure 4</b> The rerun of original ResNet-56 seed 2 on CIFAR-10,
+            evaluated every 8,000 iterations. Dashed is train error and solid is
+            test error, following the convention of Fig. 6 in [1]. After
+            iteration 40,000 the dashed line is on the floor and the solid one
+            has stopped moving, so everything left is generalisation gap.
+          </figcaption>
+        </figure>
       </section>
 
       <section>
@@ -1248,6 +1298,8 @@
           [[8000, 48.16], [16000, 41.96], [24000, 43.41], [32000, 39.8], [40000, 30.64], [48000, 30.98], [56000, 30.12], [64000, 30.35]],
           [[8000, 44.43], [16000, 41.19], [24000, 41.41], [32000, 38.84], [40000, 29.81], [48000, 30.27], [56000, 29.53], [64000, 29.61]],
         ];
+
+        var RERUN = [[8000, 13.18, 16.98], [16000, 7.78, 12.93], [24000, 7.9, 12.81], [32000, 7.17, 12.9], [40000, 0.29, 7.8], [48000, 0.17, 7.71], [56000, 0.04, 7.57], [64000, 0.03, 7.57]];
         // >>> END GENERATED
 
         // ---------------------------------------------------- Figure 1: repro
@@ -1752,9 +1804,68 @@
           ax.textContent = "TRAINING ITERATION";
         }
 
+        // ------------------------------------- Figure 4: the rerun, train+test
+        function figure4() {
+          var svg = document.getElementById("fig4");
+          var W = 760, H = 260, L = 56, R = 26, T = 22, B = 44;
+          var xlo = 0, xhi = 66000, ylo = 0, yhi = 18;
+          var x = function (v) { return L + ((v - xlo) / (xhi - xlo)) * (W - L - R); };
+          var y = function (v) { return T + ((yhi - v) / (yhi - ylo)) * (H - T - B); };
+
+          for (var g = 0; g <= 15; g += 5) {
+            el("line", { x1: L, y1: y(g), x2: W - R, y2: y(g), class: "grid" }, svg);
+            var t = el("text",
+              { x: L - 10, y: y(g) + 3.5, class: "tick", "text-anchor": "end" }, svg);
+            t.textContent = g;
+          }
+          for (var i = 0; i <= 64000; i += 16000) {
+            var xt = el("text",
+              { x: x(i), y: H - B + 16, class: "tick", "text-anchor": "middle" }, svg);
+            xt.textContent = i === 0 ? "0" : i / 1000 + "k";
+          }
+          el("line", { x1: L, y1: H - B, x2: W - R, y2: H - B, class: "ax" }, svg);
+
+          [32000, 48000].forEach(function (it) {
+            el("line",
+              { x1: x(it), y1: T, x2: x(it), y2: H - B, stroke: "var(--muted)",
+                "stroke-width": 1.2, "stroke-dasharray": "4 3", opacity: 0.75 }, svg);
+            var lt = el("text", { x: x(it) + 6, y: T + 11, class: "tick" }, svg);
+            lt.textContent = "lr /10";
+          });
+
+          // index 1 is train, 2 is test -- dashed and solid, as in Fig. 6 of [1]
+          [
+            { i: 2, dash: null, label: "test" },
+            { i: 1, dash: "5 4", label: "train" },
+          ].forEach(function (series) {
+            var d = RERUN.map(function (p, k) {
+              return (k ? "L" : "M") + x(p[0]) + " " + y(p[series.i]);
+            }).join(" ");
+            var attrs = { d: d, fill: "none", stroke: "var(--sa)", "stroke-width": 2,
+              "stroke-linejoin": "round", "stroke-linecap": "round" };
+            if (series.dash) { attrs["stroke-dasharray"] = series.dash; attrs.opacity = 0.85; }
+            el("path", attrs, svg);
+            RERUN.forEach(function (p) {
+              var dot = el("circle",
+                { cx: x(p[0]), cy: y(p[series.i]), r: 3, fill: "var(--sa)",
+                  stroke: "var(--surface)", "stroke-width": 1, opacity: 0.9 }, svg);
+              attach(dot, "iteration " + p[0].toLocaleString() + "\n" +
+                fmt(p[series.i]) + "% " + series.label + " error");
+            });
+          });
+
+          var ay = el("text",
+            { x: 2, y: T - 8, class: "axtitle", "text-anchor": "start" }, svg);
+          ay.textContent = "ERROR (%)";
+          var ax = el("text",
+            { x: (L + W - R) / 2, y: H - 8, class: "axtitle", "text-anchor": "middle" }, svg);
+          ax.textContent = "TRAINING ITERATION";
+        }
+
         figure1();
         figure2();
         figure3();
+        figure4();
       })();
     </script>
   </body>
